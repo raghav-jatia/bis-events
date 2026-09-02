@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- The tab title is replaced at runtime with site_title from the Config tab. -->
+<title>Interhouse Events</title>
+
+<!-- Google Analytics 4. One snippet in the <head> covers the whole site.
+     navigation.js will later fire a virtual page-view on each view switch so
+     Home / Completed Events / Event Detail / Calendar are tracked separately. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BE0HXKM398"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-BE0HXKM398');
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Oswald:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- The ?v= number is a cache-buster. Browsers hold on to CSS and JS for a long
+     time, so BUMP THIS NUMBER whenever you change styles.css or any .js file —
+     otherwise visitors (and you) can keep running the previous version. -->
+<link rel="stylesheet" href="styles.css?v=7">
+</head>
+<body>
+
+<!-- The icon set, defined once and referenced by <use href="#i-…"> throughout. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+  <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="6"/><path d="M9 3l3 6 3-6M8 3h8"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9L3.5 9.2l5.9-.8L12 3Z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 7"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 21V4M4 4h13l-2 4 2 4H4"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="12" rx="1"/><path d="M2 9h20M12 9v12M12 9S9.5 4 7.5 4 5 7 7 9M12 9s2.5-5 4.5-5S19 7 17 9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+</svg>
+
+<!-- ===================== HEADER =====================
+     Every word here is filled in by render.js from the Config tab. -->
+<header class="site">
+  <div class="wrap bar">
+    <a class="brand" href="#">
+      <span class="mark" id="brand-mark"></span>
+      <span><b id="brand-title"></b><span class="sub" id="brand-sub"></span></span>
+    </a>
+
+    <!-- The nav links and this Menu button are wired up in navigation.js
+         (still to be built), so they do nothing yet. -->
+    <button class="menubtn" id="menubtn">Menu</button>
+    <nav class="main" id="nav">
+      <a data-nav="home" class="active" href="#">Home</a>
+      <a data-nav="events" href="#">Completed Events</a>
+      <a data-nav="calendar" href="#">Calendar</a>
+    </nav>
+
+    <div class="meta">
+      <span class="yearpill" id="year-pill"></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Shown while the Sheet is being fetched. -->
+  <div class="notice" id="loading">
+    <div class="big">Loading…</div>
+    <div>Fetching the latest results.</div>
+  </div>
+
+  <!-- The calm fallback, for a fundamental failure only (blueprint §17). -->
+  <div class="notice" id="fallback" hidden>
+    <div class="big">Standings are temporarily unavailable</div>
+    <div>Please check back shortly.</div>
+  </div>
+
+  <!-- ===================== HOME =====================
+       Structure only. Every list below is filled in by render.js, and any
+       section with nothing to show is hidden rather than left empty. -->
+  <section class="page" id="home">
+
+    <div class="hero">
+      <div class="hero-lockup">
+        <span class="hero-trophy"><svg class="ic"><use href="#i-trophy"/></svg></span>
+        <h1><span class="grad" id="hero-title"></span><span class="yr" id="hero-year"></span></h1>
+      </div>
+      <div class="rule"></div>
+    </div>
+
+    <div id="sec-leaderboard" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-trophy"/></svg></span>
+        <h2>House Points Leaderboard</h2>
+      </div>
+      <div class="boxes" id="leaderboard"></div>
+    </div>
+
+    <div id="sec-category" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-flag"/></svg></span>
+        <h2>By Category</h2>
+      </div>
+      <div class="split">
+        <div class="mini" id="cat-sports" hidden></div>
+        <div class="mini" id="cat-cocurricular" hidden></div>
+      </div>
+    </div>
+
+    <div id="sec-extra" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-gift"/></svg></span>
+        <h2>Extra Points</h2>
+      </div>
+      <div class="extra3" id="extra"></div>
+    </div>
+
+    <div class="divider" id="home-divider" hidden></div>
+
+    <div id="sec-latest" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-trophy"/></svg></span>
+        <h2>Latest Results</h2>
+        <span class="grow"></span>
+        <span class="more" data-goto="events">All events <svg class="ic"><use href="#i-arrow"/></svg></span>
+      </div>
+      <div class="latest" id="latest"></div>
+    </div>
+
+    <div id="sec-upcoming" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-cal"/></svg></span>
+        <h2>Upcoming</h2>
+        <span class="grow"></span>
+        <span class="more" data-goto="calendar">View full calendar <svg class="ic"><use href="#i-arrow"/></svg></span>
+      </div>
+      <div class="up" id="upcoming"></div>
+    </div>
+
+    <div class="foot-spacer"></div>
+  </section>
+
+  <!-- ===================== COMPLETED EVENTS =====================
+       Same story as Home: structure only, filled in by render.js. -->
+  <section class="page" id="events">
+
+    <!-- Reached from the nav, so this always returns Home. -->
+    <span class="backbtn" id="events-back"><svg class="ic"><use href="#i-back"/></svg> Back to Home</span>
+
+    <div class="hero" style="padding:46px 0 18px">
+      <h1 style="font-size:clamp(28px,5.5vw,52px)"><span class="grad">Completed Events</span></h1>
+      <div class="rule"></div>
+    </div>
+
+    <!-- Shown instead of the table when no event has been completed yet. -->
+    <div class="notice" id="events-none" hidden>
+      <div class="big">No completed events yet</div>
+      <div>Results appear here as each event finishes.</div>
+    </div>
+
+    <div id="events-table-card" class="tablecard" hidden>
+      <div class="scroller">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Event</th><th>Details</th>
+            <th>Gold</th><th>Silver</th><th>Bronze</th><th>Status</th>
+          </tr></thead>
+          <tbody id="events-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="events-totals-band" hidden>
+      <div class="totals-cap">House Totals</div>
+      <div class="totals" id="events-totals"></div>
+    </div>
+
+    <div class="extranote" id="events-extranote" hidden>
+      <span class="lab">Includes extra points:</span>
+      <span id="events-chips"></span>
+    </div>
+
+    <div class="foot-spacer"></div>
+  </section>
+
+  <!-- ===================== EVENT DETAIL =====================
+       ONE detail view, re-rendered for whichever event was chosen. (The
+       prototype had a hardcoded section per event because its data was
+       hardcoded; here the content is filled in by renderEventDetail.) -->
+  <section class="page" id="detail">
+
+    <!-- navigation.js wires the actual "go back" behaviour. -->
+    <span class="backbtn" id="detail-back"><svg class="ic"><use href="#i-back"/></svg> Back</span>
+
+    <h1 class="detail-title" id="detail-title"></h1>
+    <p class="dmeta" id="detail-meta"></p>
+
+    <div class="dtotals" id="detail-totals" hidden></div>
+
+    <!-- Sport / Calculated variant -->
+    <div class="section" id="detail-categories" hidden>
+      <h2><span class="ico"><svg class="ic"><use href="#i-medal"/></svg></span>Results by category</h2>
+      <div class="tablecard"><div class="scroller">
+        <table>
+          <thead><tr><th>Category</th><th>Gold</th><th>Silver</th><th>Bronze</th></tr></thead>
+          <tbody id="detail-category-rows"></tbody>
+        </table>
+      </div></div>
+    </div>
+
+    <!-- Optional link to this event's live mini-site (V2). Sits directly below
+         the results, above Highlights, so it is seen early. -->
+    <div class="section minisite-section" id="detail-minisite" hidden>
+      <div id="detail-minisite-body"></div>
+    </div>
+
+    <div class="section" id="detail-highlights" hidden>
+      <h2><span class="ico"><svg class="ic"><use href="#i-star"/></svg></span>Highlights</h2>
+      <div class="writeup" id="detail-writeup"></div>
+    </div>
+
+    <!-- Co-curricular / Direct variant -->
+    <div class="section" id="detail-teams" hidden>
+      <h2><span class="ico"><svg class="ic"><use href="#i-flag"/></svg></span>Teams</h2>
+      <div class="rosters" id="detail-rosters"></div>
+    </div>
+
+    <div class="section" id="detail-photos" hidden>
+      <h2><span class="ico"><svg class="ic"><use href="#i-photo"/></svg></span>Photos</h2>
+      <div class="gallery" id="detail-gallery"></div>
+    </div>
+
+    <div class="foot-spacer"></div>
+  </section>
+
+  <!-- ===================== CALENDAR =====================
+       Every event of the season in date order, whatever its status. -->
+  <section class="page" id="calendar">
+
+    <!-- Reached from the nav, so this always returns Home. -->
+    <span class="backbtn" id="calendar-back"><svg class="ic"><use href="#i-back"/></svg> Back to Home</span>
+
+    <div class="hero" style="padding:46px 0 18px">
+      <h1 style="font-size:clamp(28px,5.5vw,52px)"><span class="grad">Calendar</span></h1>
+      <div class="rule"></div>
+    </div>
+
+    <!-- Shown instead of the table when the Events tab has no events at all. -->
+    <div class="notice" id="calendar-none" hidden>
+      <div class="big">No events scheduled yet</div>
+      <div>The calendar fills in as events are added.</div>
+    </div>
+
+    <div id="calendar-table-card" class="tablecard" hidden>
+      <div class="scroller">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Event</th><th>Grades</th><th>Details</th><th>Status</th>
+          </tr></thead>
+          <tbody id="calendar-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="foot-spacer"></div>
+  </section>
+
+</main>
+
+<!-- How current the results are. Sits quietly at the foot of every view, and is
+     hidden entirely until at least one event has been completed. -->
+<footer class="site-footer">
+  <span class="stamp-line" id="site-stamp" hidden></span>
+</footer>
+
+<!-- ===================== MODULES =====================
+     Load order matters: each file may use the ones above it.
+       config    — constants (Sheet id, allowed values)
+       utils     — small shared helpers (dates, colours, escaping)
+       data      — fetches the Sheet, builds the canonical data object
+       validate  — checks and cleans it
+       calculate — works out every number
+       render    — draws it
+       navigation— view switching, menu, Back button, analytics events
+       main      — runs the pipeline, then hands over to navigation
+-->
+<!-- Keep the ?v= number here the same as the one on styles.css above. -->
+<script src="config.js?v=7"></script>
+<script src="utils.js?v=7"></script>
+<script src="data.js?v=7"></script>
+<script src="validate.js?v=7"></script>
+<script src="calculate.js?v=7"></script>
+<script src="render.js?v=7"></script>
+<script src="navigation.js?v=7"></script>
+<script src="main.js?v=7"></script>
+
+</body>
+</html>

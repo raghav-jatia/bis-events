@@ -1,0 +1,27 @@
+# Files kept on the local machine but NOT published.
+#
+# GitHub Pages serves every file in this repository, so anything listed here
+# would otherwise become a public page on the live site.
+#
+# NOTE: a comment must be on its own line. Git treats a "#" after a pattern as
+# part of the pattern itself, so the rule would silently never match.
+
+# --- local development tooling ---
+# dev-server.py = the no-cache preview server used while building the site
+dev-server.py
+.claude/
+
+# --- planning documents (kept locally, not part of the public site) ---
+CLAUDE.md
+BIS-Interhouse-Blueprint-V1.md
+PROJECT-STATE.md
+
+# --- the design prototype ---
+# Contains hardcoded SAMPLE standings. If published it would be live at
+# /bis-interhouse-FINAL.html and could easily be mistaken for real results.
+bis-interhouse-FINAL.html
+
+# --- OS clutter ---
+.DS_Store
+Thumbs.db
+desktop.ini

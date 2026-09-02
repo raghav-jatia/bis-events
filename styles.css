@@ -1,0 +1,300 @@
+/* styles.css
+   The approved dark championship theme, ported from bis-interhouse-FINAL.html.
+
+   ONE IMPORTANT DIFFERENCE from the prototype: the prototype had a CSS class
+   per house (.alpha, .beta, .gamma, .fill.beta-f, .ecard.b …) with the house
+   colours written into the stylesheet. Those are gone. House colours live in
+   the Houses tab of the Google Sheet and are applied as inline styles by
+   render.js at runtime, so changing a colour — or running the site for a
+   different school with different houses — is a spreadsheet edit, not a code
+   edit. What remains here is only structure: layout, spacing, typography and
+   the gold/dark chrome, none of which depend on who the houses are. */
+
+:root{
+  --bg:#0a0e17; --bg2:#0c111c; --panel:#131b2b; --panel2:#182234;
+  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.055);
+  --ink:#eef2f9; --muted:#8b96ab; --muted2:#6b7688;
+  --gold:#f7b81b; --gold2:#ffd257; --gold-deep:#c9920a; --gold-glow:rgba(247,184,27,.28);
+  /* medal tokens */
+  --m1:#f5c542; --m2:#c7ced8; --m3:#cd8a4e;
+  /* status colours — these belong to STATUSES, not to houses, so they stay
+     fixed even if a house happens to be red or green */
+  --teal:#1fd0c4; --teal-dim:rgba(31,208,196,.12); --teal-line:rgba(31,208,196,.4);
+  --orange:#ff9438; --orange-dim:rgba(255,148,56,.14); --orange-line:rgba(255,148,56,.44);
+  --live:#ff5158; --live-dim:rgba(255,81,88,.15); --live-line:rgba(255,81,88,.4);
+  --done:#25d17c; --done-dim:rgba(37,209,124,.14); --done-line:rgba(37,209,124,.4);
+  /* event-TYPE icon colours. Like the status colours above these belong to the
+     type (Sport / Co-curricular), never to a house, so they stay put even if a
+     house is recoloured in the Sheet. */
+  --type-sport:#4f9dff; --type-cocurricular:#f7b81b;
+  --disp:'Archivo',system-ui,sans-serif; --num:'Oswald',system-ui,sans-serif; --body:'Public Sans',system-ui,sans-serif;
+  --maxw:1080px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
+     background-image:radial-gradient(900px 380px at 50% -120px,rgba(247,184,27,.10),transparent 70%)}
+h1,h2,h3,h4,.disp{font-family:var(--disp);letter-spacing:-.01em}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+svg.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.dot{width:11px;height:11px;border-radius:50%;flex:none}
+[hidden]{display:none!important}
+
+/* rank tokens — only GOLD glows by default; silver/bronze glow is scoped to
+   the top leaderboard. rt4 is a neutral token for 4th place and beyond, which
+   a school with more than three houses will need. */
+.rt{border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-weight:900;color:#2a1a05;flex:none}
+.rt1{background:linear-gradient(135deg,#ffe08a,var(--m1));box-shadow:0 0 12px rgba(245,197,66,.5)}
+.rt2{background:linear-gradient(135deg,#eef2f6,var(--m2));color:#2a2f36}
+.rt3{background:linear-gradient(135deg,#e6b483,var(--m3));color:#2a1a0c}
+.rt4{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.boxes .rt2{box-shadow:0 0 12px rgba(199,206,216,.6)}
+.boxes .rt3{box-shadow:0 0 12px rgba(205,138,78,.6)}
+
+header.site{position:sticky;top:0;z-index:60;background:rgba(10,14,23,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:14px;height:64px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.mark{width:38px;height:38px;background:linear-gradient(135deg,var(--gold2),var(--gold-deep));border-radius:9px;display:grid;place-items:center;font-family:var(--disp);font-weight:900;font-size:14px;color:#20160a;box-shadow:0 0 18px var(--gold-glow);flex:none;overflow:hidden}
+.mark img{width:100%;height:100%;object-fit:cover}
+.brand b{font-family:var(--disp);font-weight:900;font-size:16px;line-height:1.05}
+.brand .sub{display:block;font-size:9.5px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+nav.main{margin-left:auto;display:flex;gap:4px}
+nav.main a{font-weight:700;font-size:14px;color:var(--muted);padding:9px 13px;border-radius:8px;position:relative;font-family:var(--disp)}
+nav.main a:hover{color:var(--ink);background:var(--panel)}
+nav.main a.active{color:var(--ink)}
+nav.main a.active::after{content:"";position:absolute;left:13px;right:13px;bottom:2px;height:2.5px;background:var(--gold);border-radius:2px;box-shadow:0 0 10px var(--gold-glow)}
+.meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-left:12px;border-left:1px solid var(--line)}
+.yearpill{font-family:var(--disp);font-weight:800;font-size:12px;background:linear-gradient(135deg,var(--gold2),var(--gold-deep));color:#20160a;padding:3px 10px;border-radius:20px}
+/* The "results as of" line lives in the site footer, not the header — see
+   .site-footer below. Nothing in the header carries it any more. */
+.menubtn{display:none;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:8px 11px;font-family:var(--disp);font-weight:700;font-size:13px;cursor:pointer}
+
+main{padding-bottom:64px}
+.foot-spacer{height:80px}
+
+/* Site footer — deliberately quiet. Shown on every view, desktop and mobile. */
+.site-footer{border-top:1px solid var(--line2);padding:20px;text-align:center}
+.stamp-line{font-size:11.5px;color:var(--muted2);letter-spacing:.03em;font-weight:500}
+.page{display:none;animation:fade .35s ease}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* loading + the calm fallback message (blueprint §17) */
+.notice{text-align:center;padding:90px 20px;color:var(--muted)}
+.notice .big{font-family:var(--disp);font-weight:800;font-size:19px;color:var(--ink);margin-bottom:8px}
+
+.hero{text-align:center;padding:52px 0 30px}
+.hero-lockup{display:inline-flex;align-items:center;justify-content:center;gap:22px;text-align:left}
+.hero-trophy{font-size:clamp(48px,8vw,80px);color:var(--gold);display:flex;filter:drop-shadow(0 0 22px var(--gold-glow));flex:none}
+.hero h1{font-size:clamp(32px,6.2vw,64px);font-weight:900;line-height:.96;text-transform:uppercase;letter-spacing:-.02em}
+.hero .grad{background:linear-gradient(100deg,#fff 8%,var(--gold2) 52%,var(--gold-deep));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero .yr{display:block;font-family:var(--num);font-weight:600;font-size:.34em;color:#fff;letter-spacing:.22em;margin-top:14px}
+.rule{width:54px;height:4px;background:var(--gold);border-radius:3px;margin:22px auto 0;box-shadow:0 0 16px var(--gold-glow)}
+.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);margin:54px 0 6px}
+
+.sechead{display:flex;align-items:center;gap:10px;margin:46px 0 16px}
+.sechead .ico{color:var(--gold);font-size:20px;display:flex}
+.sechead h2{font-size:19px;font-weight:800;letter-spacing:.01em}
+.sechead .grow{flex:1}
+.sechead .more{font-family:var(--disp);font-weight:800;font-size:14.5px;color:var(--gold);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.sechead .more:hover{color:var(--gold2)}
+
+/* Per-house grids use auto-fit, NOT a fixed 3 columns: the number of houses
+   comes from the Houses tab, so three is this school's answer, not the code's.
+   auto-fit gives three equal boxes for three houses, five for five, and wraps
+   sensibly beyond that. */
+.boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+.hbox{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:18px;padding:26px 18px;text-align:center;position:relative;overflow:hidden}
+.hbox .strip{position:absolute;top:0;left:0;right:0;height:6px}
+.hbox.win{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 20px 50px -28px var(--gold-glow)}
+.hbox .rankbadge{position:absolute;top:12px;right:12px}
+.hbox .rankbadge .rt{width:34px;height:34px;font-size:15px}
+.hbox .bname{font-family:var(--disp);font-weight:900;font-size:23px;margin-top:6px}
+.hbox .bpts{font-family:var(--num);font-weight:700;font-size:58px;line-height:1;margin:8px 0 2px}
+.hbox .blab{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted2)}
+
+.fill{height:100%;border-radius:8px}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.mini{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.mini h3{font-size:13px;font-weight:800;font-family:var(--disp);letter-spacing:.05em;text-transform:uppercase;padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.mini h3 .ico{color:var(--gold);font-size:16px;display:flex}
+.minirow{display:grid;grid-template-columns:1fr 54px;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line2)}
+.minirow:last-child{border-bottom:none}
+.mh{font-family:var(--disp);font-weight:800;font-size:15px;display:flex;align-items:center;gap:9px}
+.mh .rt{width:20px;height:20px;font-size:10px}
+.mt{height:9px;border-radius:6px;background:rgba(255,255,255,.05);margin-top:7px;margin-left:29px;overflow:hidden}
+.mp{font-family:var(--num);font-weight:700;font-size:24px;text-align:right}
+
+/* Per-house. 220px keeps the Reason · Date · Pts columns inside the card. */
+.extra3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.ecard{background:linear-gradient(180deg,var(--panel2),var(--bg2));border:1px solid var(--line);border-radius:14px;overflow:hidden;border-top:3px solid}
+.ecard .ehead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;cursor:pointer;width:100%;background:none;border:none;color:inherit;text-align:left;font:inherit}
+.ecard .eh{font-family:var(--disp);font-weight:900;font-size:16px}
+.ecard .ehright{display:flex;align-items:center;gap:10px}
+.ecard .etot{font-family:var(--num);font-weight:700;font-size:24px}
+.ecard .chev{color:var(--muted2);font-size:18px;display:flex;transition:transform .25s}
+.ecard.open .chev{transform:rotate(180deg)}
+.ecard .edetails{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.ecard.open .edetails{max-height:400px}
+.ecard .ehdr,.ecard .erow{display:grid;grid-template-columns:1fr 58px 40px;gap:12px;align-items:center;padding:8px 16px}
+.ecard .ehdr{border-top:1px solid var(--line2);font-family:var(--disp);font-weight:800;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted2)}
+.ecard .ehdr span:nth-child(2),.ecard .erow .rd{text-align:right}
+.ecard .ehdr span:nth-child(3),.ecard .erow .rp{text-align:right}
+.ecard .erow{border-top:1px solid var(--line2);font-size:13px}
+.ecard .erow .rr{color:#e2e7f0;font-weight:600}
+.ecard .erow .rd{color:var(--muted);font-size:12px;white-space:nowrap}
+.ecard .erow .rp{font-family:var(--num);font-weight:700;font-size:15px;color:var(--gold2)}
+
+.latest{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.lcard{background:linear-gradient(160deg,var(--teal-dim),var(--bg2));border:1px solid var(--teal-line);border-radius:16px;padding:16px 18px;transition:.15s;display:flex;align-items:center;gap:15px}
+/* the .clickable class is added by navigation.js, and ONLY to things it has
+   actually wired up — so nothing ever looks interactive before it is */
+.lcard.clickable{cursor:pointer}
+.lcard.clickable:hover{transform:translateY(-2px);box-shadow:0 16px 40px -26px var(--teal-line)}
+.lcard .cup{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#ffe08a,var(--gold-deep));display:grid;place-items:center;color:#3a2907;font-size:23px;flex:none;box-shadow:0 0 18px var(--gold-glow)}
+.lcard .lc-t{flex:1;min-width:0}
+.lcard .lc-date{font-family:var(--disp);font-size:11px;color:var(--teal);font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.lcard .lc-name{font-family:var(--disp);font-weight:800;font-size:17px;margin:2px 0 6px}
+.lcard .places{display:flex;flex-wrap:wrap;gap:6px 14px}
+.lcard .pl{font-family:var(--disp);font-weight:800;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.lcard .pl .rt{width:17px;height:17px;font-size:9px}
+.lcard .pl .amp{color:var(--muted);font-weight:700;margin:0 1px}
+.lcard .go{color:var(--teal);font-size:20px;display:flex;flex:none}
+
+/* NOT per-house — this is the "next 3 events" grid, so 3 is the spec (§6.1). */
+.up{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.ucard{background:linear-gradient(160deg,var(--orange-dim),var(--bg2));border:1px solid var(--orange-line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:.15s}
+.ucard .evicon{width:40px;height:40px;border-radius:11px;background:rgba(255,148,56,.2);display:grid;place-items:center;color:#ffb877;font-size:21px}
+.ucard .en{font-family:var(--disp);font-weight:900;font-size:21px;color:#fff}
+.ucard .datebox{display:flex;align-items:baseline;gap:8px}
+.ucard .d{font-family:var(--num);font-weight:700;font-size:26px;line-height:1;color:#ffb877}
+.ucard .mo{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.04em;text-transform:uppercase;color:#e9c9a5}
+
+/* ---- shared bits used by the later views (tables, detail, calendar) ---- */
+.tablecard{background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.scroller{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;min-width:640px}
+thead th{background:linear-gradient(180deg,var(--gold2),var(--gold));font-family:var(--disp);font-weight:800;font-size:12px;letter-spacing:.05em;text-transform:uppercase;text-align:left;padding:13px 18px;color:#3a2907;white-space:nowrap}
+tbody td{padding:15px 18px;font-size:14.5px;vertical-align:middle;border-bottom:1px solid var(--line2)}
+tbody tr:nth-child(odd){background:rgba(255,255,255,.022)}
+tbody tr:nth-child(even){background:rgba(255,255,255,.06)}
+tbody tr:last-child td{border-bottom:none}
+tr.clickable{cursor:pointer;transition:background .12s}
+tr.clickable:hover{background:rgba(247,184,27,.1)}
+.ev-date{font-family:var(--disp);font-weight:800;color:#fff;font-size:15.5px;white-space:nowrap}
+.ev-grades{font-family:var(--disp);font-weight:800;color:#fff;font-size:15px;white-space:nowrap}
+.ev-name{font-family:var(--disp);font-weight:800;font-size:15.5px;display:flex;align-items:center;gap:10px}
+.ev-name .tico{font-size:17px;display:flex}
+.ev-name .tico.sport{color:var(--type-sport)}
+.ev-name .tico.cc{color:var(--type-cocurricular)}
+.viewcue{font-family:var(--disp);font-weight:800;font-size:12.5px;color:var(--gold2);background:rgba(247,184,27,.14);border:1px solid rgba(247,184,27,.4);padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
+.hcell{font-family:var(--disp);font-weight:800;white-space:nowrap}
+.empty{color:var(--muted2)}
+.statusdot{display:inline-flex;align-items:center;gap:6px;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:4px 11px;border-radius:20px}
+.st-done{background:var(--done-dim);color:#5fdc9d;border:1px solid var(--done-line)}
+.st-up{background:var(--orange-dim);color:#ffb877;border:1px solid var(--orange-line)}
+.st-live{background:var(--live-dim);color:#ff8a8f;border:1px solid var(--live-line);cursor:pointer}
+.st-live .d{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.2s infinite}
+
+.totals-cap{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:#fff;text-align:center;margin:34px 0 6px}
+/* Per-house (used by the views still to be built) — same auto-fit rule. */
+.totals,.dtotals{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:8px}
+.tbox,.dtbox{border-radius:16px;padding:18px 16px;position:relative;overflow:hidden;border:1px solid;min-height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.tbox.win,.dtbox.win{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 16px 40px -26px var(--gold-glow)}
+.tbox .rt,.dtbox .rt{position:absolute;left:16.66%;top:50%;transform:translate(-50%,-50%);width:46px;height:46px;font-size:19px}
+.tbox .tl,.dtbox .ph{font-family:var(--disp);font-weight:900;font-size:21px}
+.tbox .tv,.dtbox .score{font-family:var(--num);font-weight:700;font-size:40px;line-height:1;margin-top:6px}
+.extranote{margin-top:22px;padding-top:16px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
+.extranote .lab{font-size:12.5px;color:#fff;font-weight:600;letter-spacing:.02em}
+.echip{font-family:var(--disp);font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:20px;border:1px solid}
+
+.backbtn{display:inline-flex;align-items:center;gap:8px;font-family:var(--disp);font-weight:800;font-size:13px;color:var(--gold);background:rgba(247,184,27,.1);border:1px solid rgba(247,184,27,.3);padding:9px 15px;border-radius:10px;margin:30px 0 22px;cursor:pointer}
+.backbtn:hover{background:rgba(247,184,27,.18)}
+.detail-title{font-size:clamp(28px,5vw,46px);font-weight:900;text-transform:uppercase;line-height:.98}
+.dmeta{color:var(--muted);font-size:14.5px;margin:10px 0 26px;font-weight:500}
+.section{margin-top:38px}
+.section > h2{font-size:18px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:9px}
+.section > h2 .ico{color:var(--gold);font-size:19px;display:flex}
+.writeup{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+.writeup p{font-size:15px;color:#fff;margin-top:10px} .writeup p:first-child{margin-top:0}
+.writeup .hl{color:var(--gold2);font-weight:600}
+.cat-name{color:#fff;font-family:var(--disp);font-weight:800;font-size:15px}
+.rosters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.roster{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.roster h4{font-family:var(--disp);font-weight:900;font-size:15px;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.roster ul{list-style:none;padding:8px 0}
+.roster li{padding:7px 16px;font-size:14px;font-weight:500}
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.photo{aspect-ratio:4/3;border-radius:12px;background:linear-gradient(135deg,#1b2436,#141b29);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted2);font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.08em}
+/* real photos fill the same tile shape as the placeholder above */
+img.photo{width:100%;height:100%;object-fit:cover;display:block}
+/* ---- Live Mini-Site link (Event Detail) ----
+   Just the button, sitting directly below the results. */
+.minisite-section{margin-top:26px}
+.minisite-btn{font-family:var(--disp);font-weight:800;font-size:14.5px;
+  background:linear-gradient(135deg,var(--gold2),var(--gold-deep));color:#20160a;
+  padding:11px 20px;border-radius:10px;display:inline-flex;align-items:center;gap:8px;
+  white-space:nowrap;box-shadow:0 0 22px var(--gold-glow);transition:.15s}
+.minisite-btn:hover{transform:translateY(-1px);filter:brightness(1.06)}
+
+.cal-link{font-family:var(--disp);font-weight:800;font-size:12.5px;color:var(--gold2);background:rgba(247,184,27,.14);border:1px solid rgba(247,184,27,.4);padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.cal-link:hover{background:rgba(247,184,27,.24)}
+/* the "View live" variant — status red, independent of any house colour.
+   Inert until V2 builds the live mini-sites, so it does not offer a pointer. */
+.cal-link.live{color:#ff8a8f;background:var(--live-dim);border-color:var(--live-line);cursor:default}
+/* a status the site doesn't recognise still renders as a calm neutral pill */
+.st-other{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+
+/* ---------------- MOBILE ---------------- */
+@media(max-width:760px){
+  .bar{gap:10px}
+  /* Keep the site title on ONE line. A long title (site_title comes from the
+     Sheet and can be any length) otherwise wraps into a narrow three-line
+     stack inside the 64px bar, which reads as cramped. */
+  .brand{flex:1;min-width:0;padding-right:12px}
+  .brand > span:last-child{min-width:0}
+  /* display:block matters — ellipsis has no effect on an inline element, so
+     without it the title simply spills over the Menu button. */
+  .brand b{font-size:14.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  nav.main{display:none;position:absolute;top:58px;right:20px;left:auto;width:auto;flex-direction:column;align-items:stretch;background:linear-gradient(180deg,var(--gold2),var(--gold));border:1px solid var(--gold-deep);border-radius:12px;padding:6px;box-shadow:0 18px 40px -20px rgba(247,184,27,.5)}
+  nav.main.open{display:inline-flex}
+  nav.main a{padding:10px 16px;color:#3a2907;text-align:right;border-radius:8px;font-weight:800}
+  nav.main a.active::after{display:none}
+  nav.main a.active{color:#1c1c1e;background:rgba(0,0,0,.12)}
+  .menubtn{display:block}.meta{display:none}
+  .hero{padding:38px 0 24px}
+  .sechead{margin:38px 0 14px}
+  .split,.up,.extra3,.latest,.boxes,.totals,.dtotals,.rosters{grid-template-columns:1fr}
+  .gallery{grid-template-columns:repeat(2,1fr)}
+  .hbox{padding:20px 18px}
+  .hbox .bpts{font-size:52px}
+  .lcard .lc-name{font-size:16px}
+
+  /* tables → stacked cards, event name = gold header bar */
+  .tablecard{background:transparent;border:none;overflow:visible}
+  .tablecard .scroller{overflow:visible}
+  .tablecard table{min-width:0;border-collapse:separate;border-spacing:0}
+  .tablecard thead{display:none}
+  .tablecard tbody,.tablecard td{display:block;width:100%}
+  .tablecard tbody tr{display:flex;flex-direction:column;background:var(--bg2)!important;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:12px}
+  .tablecard tbody tr:last-child{margin-bottom:0}
+  .tablecard td{border:none!important;padding:9px 16px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:14px}
+  .tablecard td+td{border-top:1px solid var(--line2)!important}
+  .tablecard td::before{content:attr(data-label);font-family:var(--disp);font-weight:800;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#fff;flex:none}
+  .tablecard td:empty{display:none}
+  .tablecard td.mobile-head{order:-1;background:linear-gradient(180deg,var(--gold2),var(--gold));padding:12px 16px;border:none!important;color:#3a2907}
+  .tablecard td.mobile-head::before{display:none}
+  .tablecard td.mobile-head .ev-name{font-size:16px;color:#3a2907}
+  /* The event-type icon must go dark on the gold header bar. Without this the
+     icon keeps its blue/gold type colour and disappears against the gold. */
+  .tablecard td.mobile-head .ev-name .tico,
+  .tablecard td.mobile-head .ev-name .tico.sport,
+  .tablecard td.mobile-head .ev-name .tico.cc{color:#3a2907}
+  .viewcue,.cal-link{width:auto}
+}
+@media(max-width:400px){ .brand .sub{display:none} }
