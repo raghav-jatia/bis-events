@@ -46,7 +46,7 @@ This guide is for the students and staff who **maintain** the site. It's written
 - ✅ **Do** sort, filter and hide rows as much as you like — see section 5.
 - ✅ **Do** use the dropdown lists for **house**, **status**, **type** — never type these by hand (a typo like "alpha" vs "Alpha" can break colours). *(Exception: for a tie, you may type two house names in one place cell — see "Enter results" below. A small orange triangle appears; that's expected and harmless.)*
 - ✅ **Do** leave a cell **blank** if there's no data (e.g. no bronze winner). Blank is fine — the site just hides it.
-- ℹ️ If you make a mistake, don't panic: **File → Version history** lets you undo, and there's a weekly backup.
+- ℹ️ If you make a mistake, don't panic: **File → Version history** lets you undo. (There is no automatic backup yet — see section 6.)
 
 ---
 
@@ -98,6 +98,12 @@ Occasionally the official house order is decided by a person — a head judge, a
 | `Calculated` | Most sports — you have individual results per category | The site adds up the Results tab |
 | `Direct` | Most co-curriculars — you only know which house won | The direct_1st/2nd/3rd cells |
 | `Override` | A judge set the house order by hand | The direct_1st/2nd/3rd cells |
+
+### Filtering the event lists on the website
+
+The **Calendar** and **Completed Events** pages each have three buttons above the table: **All**, **Sports**, **Co-curricular**. They only change what you're looking at — no points, no totals, nothing in the Sheet. The House Totals below the table stay the same whichever you pick.
+
+Your choice follows you between the two pages, and it survives opening an event and pressing Back — so you can work through a filtered list without setting it again each time. It goes back to **All** when you visit the **Home** page, or reload. If a page happens to hold only one kind of event, the buttons don't appear at all.
 
 ### The two override columns — `tier1_override` and `tier2_override`
 
@@ -205,7 +211,7 @@ Work down this list:
    - *An event scoring nothing at all?* Check it has a **results_mode**.
 3. **Check the event_id matches** between the Events tab and the Results/Rosters rows.
 4. **Use the debug view:** add `?debug` to the end of the website's address (e.g. `…/index.html?debug`). It lists any data problems it found — duplicate IDs, unknown houses, bad dates, a broken point scheme, an event with results that isn't marked Completed — in plain messages, each naming the tab, the row and the column to go and fix.
-5. Still stuck? Use **File → Version history** to undo recent changes, or restore from the weekly backup.
+5. Still stuck? Use **File → Version history** to undo recent changes, or restore from your most recent manual copy (section 6).
 
 The site is built to **skip a bad row and keep working** rather than crash — so a single mistake won't take the whole site down. If a whole tab goes missing (Results, Rosters, Extra Points) the rest of the site still loads, and `?debug` tells you which one and whether the standings are affected.
 
@@ -230,8 +236,9 @@ A **renamed or deleted column heading** used to be invisible in the same way. It
 
 ## 6. Backups
 
-- A small automatic script copies the whole workbook to a dated file in a **"Backups"** Drive folder **once a week**. You don't need to do anything.
-- Google's **File → Version history** is your instant undo for recent edits.
+- ⚠️ **There is no automatic backup yet.** An automatic weekly copy into a "Backups" Drive folder is planned but **has not been set up**, so please don't rely on one existing.
+- **Until it is, make a copy yourself once a term** — *File → Make a copy*, name it with today's date, and keep it in a "Backups" folder. It takes ten seconds and it is the only thing that protects you from an accidental mass delete.
+- Google's **File → Version history** is your instant undo for recent edits, and it goes back a long way. This is your main safety net day to day.
 - At year-end, the archived copy (§4) is a permanent snapshot.
 
 ---

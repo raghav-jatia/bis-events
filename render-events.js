@@ -22,6 +22,169 @@
 //   renderCalendar(data)
 
 // =====================================================================
+// SECTION 0 — the type filter, shared by both tables
+// =====================================================================
+
+/**
+ * The three pills above each table. `type` null means "show everything".
+ *
+ * The icons and colour names are the ones the site already uses for an event's
+ * type beside its name (typeIconHtml in render-shared.js) — a Sports pill and
+ * a Sports row are marked the same way, so the pill explains itself.
+ */
+const EVENT_TYPE_FILTERS = [
+  { key: "all", label: "All", type: null, tone: "all", icon: "" },
+  {
+    key: "sport",
+    label: "Sports",
+    type: EVENT_TYPE.SPORT,
+    tone: "sport",
+    icon: "medal",
+  },
+  {
+    key: "cocurricular",
+    label: "Co-curricular",
+    type: EVENT_TYPE.COCURRICULAR,
+    tone: "cc",
+    icon: "star",
+  },
+];
+
+/**
+ * Which filter is chosen — ONE value for both pages, not one each.
+ *
+ * WHY SHARED. Completed Events and the Calendar are two views of the same list,
+ * and somebody narrowing to Sports is usually doing that for as long as they
+ * are thinking about sport, not for as long as they happen to be on one page.
+ * It survives opening an event and pressing Back, too, which is the whole point:
+ * browsing a filtered list, looking at one of its events and returning is the
+ * ordinary way these pages get used.
+ *
+ * It is safe to share because the pills are on both pages and always show which
+ * one is active — nothing is hidden without something on screen saying so.
+ *
+ * WHERE IT ENDS. Going Home clears it (navigation.js does that, on the one
+ * function every view change goes through). Home is where somebody arrives and
+ * where they go to start again, so it is the natural full stop — and it means a
+ * filter can never be left on from a session the visitor has forgotten about.
+ * It is not remembered across a reload either.
+ */
+let activeEventTypeFilter = "all";
+
+/**
+ * Clear the filter. Returns true only if it actually changed, so the caller
+ * knows whether the tables need redrawing — reaching Home with nothing filtered
+ * is the common case and must not cost a redraw.
+ */
+function resetEventTypeFilter() {
+  if (activeEventTypeFilter === "all") return false;
+  activeEventTypeFilter = "all";
+  return true;
+}
+
+function eventTypeFilterByKey(key) {
+  return EVENT_TYPE_FILTERS.find(function (entry) {
+    return entry.key === key;
+  }) || EVENT_TYPE_FILTERS[0];
+}
+
+/** Set the chosen filter. navigation.js calls this, then redraws both tables. */
+function setEventTypeFilter(key) {
+  activeEventTypeFilter = eventTypeFilterByKey(key).key;
+}
+
+/**
+ * Is filtering meaningful on this page at all?
+ *
+ * Only when BOTH recognised types are present. With one type (or none), the
+ * pills would be three buttons where two of them empty the table, so the row is
+ * hidden — and, just as importantly, the filter is then ignored for this page.
+ *
+ * That second half matters because the choice is shared between the two pages:
+ * without it, picking Co-curricular on the Calendar could leave a
+ * Sports-only Completed Events page showing an empty table with no visible
+ * control to undo it.
+ */
+function eventTypesPresent(events) {
+  const known = [EVENT_TYPE.SPORT, EVENT_TYPE.COCURRICULAR];
+  return known.filter(function (type) {
+    return events.some(function (event) {
+      return event.type === type;
+    });
+  });
+}
+
+/**
+ * The events this page should actually draw.
+ *
+ * Note an event whose `type` is blank or unrecognised matches neither specific
+ * filter, so it appears under "All" only. That is a data fault validate.js has
+ * already reported against the exact cell; this is not the place to paper over
+ * it, and "All" still shows it.
+ */
+function eventsPassingTypeFilter(events) {
+  if (eventTypesPresent(events).length < 2) return events;
+
+  const chosen = eventTypeFilterByKey(activeEventTypeFilter);
+  if (!chosen.type) return events;
+
+  return events.filter(function (event) {
+    return event.type === chosen.type;
+  });
+}
+
+/**
+ * Draw one page's pill row, or hide it when this page has only one type.
+ *
+ * `events` is the page's FULL list, before filtering — otherwise choosing
+ * Sports would leave only sports on the page, which would then look like a
+ * one-type page and hide the very control needed to get back.
+ */
+function renderTypeFilter(containerId, events) {
+  const container = el(containerId);
+  if (!container) return;
+
+  if (eventTypesPresent(events).length < 2) {
+    container.innerHTML = "";
+    container.hidden = true;
+    return;
+  }
+
+  // ALREADY DRAWN: update the pressed state in place rather than rebuilding.
+  //
+  // This is a keyboard-accessibility fix, not an optimisation. Replacing the
+  // markup destroys the very button the visitor just pressed Enter on, so focus
+  // falls back to <body> and their next Tab starts again from the top of the
+  // page — which makes the filter effectively unusable without a mouse. The
+  // labels never change, so there is nothing to rebuild anyway.
+  const existing = container.querySelectorAll(".tpill");
+  if (existing.length === EVENT_TYPE_FILTERS.length) {
+    Array.prototype.forEach.call(existing, function (button) {
+      button.setAttribute(
+        "aria-pressed",
+        button.dataset.typeFilter === activeEventTypeFilter ? "true" : "false"
+      );
+    });
+    container.hidden = false;
+    return;
+  }
+
+  container.innerHTML = EVENT_TYPE_FILTERS.map(function (entry) {
+    const isOn = entry.key === activeEventTypeFilter;
+    return (
+      '<button type="button" class="tpill ' + entry.tone + '" ' +
+      'data-type-filter="' + entry.key + '" ' +
+      'aria-pressed="' + (isOn ? "true" : "false") + '">' +
+      (entry.icon ? '<span class="tico">' + icon(entry.icon) + "</span>" : "") +
+      escapeHtml(entry.label) +
+      "</button>"
+    );
+  }).join("");
+
+  container.hidden = false;
+}
+
+// =====================================================================
 // SECTION 1 — Completed Events
 // =====================================================================
 
@@ -70,11 +233,7 @@ function placingCellHtml(data, event, position, label) {
  * Each row carries data-event-id so navigation.js can open that event's
  * Detail page.
  */
-function renderCompletedEventsTable(data) {
-  const completed = data.events
-    .filter(hasTakenPlace)
-    .sort(byDateNewestFirst);
-
+function renderCompletedEventsTable(data, completed) {
   const rows = completed
     .map(function (event) {
       return (
@@ -109,8 +268,6 @@ function renderCompletedEventsTable(data) {
   el("events-rows").innerHTML = rows;
   showSection("events-table-card", rows !== "");
   showSection("events-none", rows === "");
-
-  return completed.length;
 }
 
 /**
@@ -181,9 +338,18 @@ function renderEventsExtraNote(data) {
  * table with headings and no rows.
  */
 function renderCompletedEvents(data) {
-  const completedCount = renderCompletedEventsTable(data);
+  const completed = data.events
+    .filter(hasTakenPlace)
+    .sort(byDateNewestFirst);
 
-  if (completedCount === 0) {
+  // The pills are built from the FULL list, and the table from the filtered
+  // one. House Totals below are decided by `completed` too, never by what the
+  // filter left on screen: the totals are the season standings, and narrowing
+  // the table to Sports must not make the leaderboard look different.
+  renderTypeFilter("events-filter", completed);
+  renderCompletedEventsTable(data, eventsPassingTypeFilter(completed));
+
+  if (completed.length === 0) {
     // Clear as well as hide, so nothing stale can reappear on a later redraw.
     fillOrHide("events-totals-band", "events-totals", "");
     fillOrHide("events-extranote", "events-chips", "");
@@ -227,7 +393,12 @@ function calendarDetailsCellHtml(event) {
  * half-filled row is still visible to whoever needs to fix it.
  */
 function renderCalendar(data) {
-  const events = data.events.slice().sort(byDateEarliestFirst);
+  const all = data.events.slice().sort(byDateEarliestFirst);
+
+  // Pills from the full season, rows from the filtered list — same split as
+  // the Completed Events page above, and the same shared choice.
+  renderTypeFilter("calendar-filter", all);
+  const events = eventsPassingTypeFilter(all);
 
   const rows = events
     .map(function (event) {

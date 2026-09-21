@@ -80,6 +80,19 @@ function showView(viewId, eventId) {
     }
   }
 
+  // Going Home clears the event-type filter, wherever the visitor came from —
+  // a nav link, a Back button, a deep link. This is the one function every view
+  // change passes through, which is why it belongs here and not on the nav link.
+  //
+  // The two list pages (and an Event Detail opened from one of them) keep the
+  // filter between them; Home ends it. Redrawn only when it actually changed,
+  // so the usual case of reaching Home with nothing filtered costs nothing.
+  if (viewId === VIEWS.HOME && resetEventTypeFilter()) {
+    renderCompletedEvents(navigationData);
+    renderCalendar(navigationData);
+    markInteractiveElements();
+  }
+
   // Only one section carries the "on" class at a time; styles.css does the rest
   // (including the gentle fade-in).
   Object.keys(VIEW_TITLES).forEach(function (id) {
@@ -362,6 +375,22 @@ function wireContentClicks() {
     const moreLink = target.closest("[data-goto]");
     if (moreLink) {
       showView(moreLink.dataset.goto);
+      return;
+    }
+
+    // An All / Sports / Co-curricular pill above either event table.
+    //
+    // BOTH tables are redrawn, not just the one that was clicked, because the
+    // chosen type is shared between the two pages — redrawing only the visible
+    // one would leave the other showing the previous filter's rows behind its
+    // own pills. markInteractiveElements runs again because every row in those
+    // tables is brand-new DOM and would otherwise lose its click behaviour.
+    const filterPill = target.closest("[data-type-filter]");
+    if (filterPill) {
+      setEventTypeFilter(filterPill.dataset.typeFilter);
+      renderCompletedEvents(navigationData);
+      renderCalendar(navigationData);
+      markInteractiveElements();
       return;
     }
 

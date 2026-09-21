@@ -25,7 +25,7 @@
 <!-- The ?v= number is a cache-buster. Browsers hold on to CSS and JS for a long
      time, so BUMP THIS NUMBER whenever you change styles.css or any .js file —
      otherwise visitors (and you) can keep running the previous version. -->
-<link rel="stylesheet" href="styles.css?v=36">
+<link rel="stylesheet" href="styles.css?v=41">
 </head>
 <body>
 
@@ -190,6 +190,11 @@
       <div>Results appear here as each event finishes.</div>
     </div>
 
+    <!-- Type filter. Drawn by render-events.js, which also hides the whole
+         row when this page holds only one kind of event. -->
+    <div class="typefilter" id="events-filter" role="group"
+         aria-label="Filter events by type" hidden></div>
+
     <div id="events-table-card" class="tablecard" hidden>
       <div class="scroller">
         <table>
@@ -298,6 +303,11 @@
       <div>The calendar fills in as events are added.</div>
     </div>
 
+    <!-- Type filter. Shares its chosen type with the Completed Events page —
+         see render-events.js. -->
+    <div class="typefilter" id="calendar-filter" role="group"
+         aria-label="Filter events by type" hidden></div>
+
     <div id="calendar-table-card" class="tablecard" hidden>
       <div class="scroller">
         <table>
@@ -339,18 +349,18 @@
      both need lives in render-shared.js, which is why that one loads first.
 -->
 <!-- Keep the ?v= number here the same as the one on styles.css above. -->
-<script src="config.js?v=36"></script>
-<script src="utils.js?v=36"></script>
-<script src="data.js?v=36"></script>
-<script src="validate.js?v=36"></script>
-<script src="calculate.js?v=36"></script>
-<script src="render-shared.js?v=36"></script>
-<script src="render-home.js?v=36"></script>
-<script src="render-events.js?v=36"></script>
-<script src="render-detail.js?v=36"></script>
-<script src="render-debug.js?v=36"></script>
-<script src="navigation.js?v=36"></script>
-<script src="main.js?v=36"></script>
+<script src="config.js?v=41"></script>
+<script src="utils.js?v=41"></script>
+<script src="data.js?v=41"></script>
+<script src="validate.js?v=41"></script>
+<script src="calculate.js?v=41"></script>
+<script src="render-shared.js?v=41"></script>
+<script src="render-home.js?v=41"></script>
+<script src="render-events.js?v=41"></script>
+<script src="render-detail.js?v=41"></script>
+<script src="render-debug.js?v=41"></script>
+<script src="navigation.js?v=41"></script>
+<script src="main.js?v=41"></script>
 
 </body>
 </html>

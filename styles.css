@@ -343,6 +343,31 @@ tr.clickable:hover{background:rgba(247,184,27,.1)}
 .ev-name .tico.cc{color:var(--type-cocurricular)}
 .viewcue{font-family:var(--disp);font-weight:800;font-size:12.5px;color:var(--gold2);background:rgba(247,184,27,.14);border:1px solid rgba(247,184,27,.4);padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
 tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
+
+/* ---- TYPE FILTER (above both event tables) ----
+   Deliberately the same pill as .viewcue and .statusdot above: same display
+   font at 800, same 12.5px, same 20px radius, same 5px icon gap. The only
+   departure is a little more padding — these are standalone controls meant to
+   be tapped on a phone, not a cue inside a table cell — and even that is kept
+   to the smallest amount that gives a sane touch target.
+   An unselected pill is neutral. A selected one wears the colour the site
+   already uses for that event type everywhere else (--type-sport,
+   --type-cocurricular), so the pill and the icons in the rows beneath it agree.
+   "All" is NOT given a type colour: it isn't a type, and --type-cocurricular is
+   the same gold, so the two selected states would have been indistinguishable. */
+.typefilter{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.tpill{font-family:var(--disp);font-weight:800;font-size:12.5px;
+  padding:8px 15px;border-radius:20px;display:inline-flex;align-items:center;
+  gap:5px;white-space:nowrap;cursor:pointer;transition:.15s;
+  color:var(--muted);background:transparent;border:1px solid var(--line)}
+.tpill .tico{display:flex;font-size:14px}
+.tpill:hover{color:var(--ink);border-color:var(--line2);background:rgba(255,255,255,.04)}
+.tpill[aria-pressed="true"]{color:var(--ink);background:rgba(255,255,255,.09);
+  border-color:rgba(255,255,255,.28)}
+.tpill.sport[aria-pressed="true"]{color:var(--type-sport);
+  background:rgba(79,157,255,.14);border-color:rgba(79,157,255,.45)}
+.tpill.cc[aria-pressed="true"]{color:var(--type-cocurricular);
+  background:rgba(247,184,27,.14);border-color:rgba(247,184,27,.4)}
 .hcell{font-family:var(--disp);font-weight:800;white-space:nowrap}
 .empty{color:var(--muted2)}
 .statusdot{display:inline-flex;align-items:center;gap:6px;font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.03em;text-transform:uppercase;padding:4px 11px;border-radius:20px}
@@ -565,5 +590,18 @@ tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
   .tablecard td.mobile-head .ev-name .tico.sport,
   .tablecard td.mobile-head .ev-name .tico.cc{color:#3a2907}
   .viewcue,.cal-link{width:auto}
+  /* A touch more height on a phone, where these are thumbed rather than
+     clicked: 36px tall rather than 32. They wrap onto a second line if they
+     have to — "Co-curricular" is a long word and the label is the real type
+     name used everywhere else, so it is not worth abbreviating. */
+  .tpill{padding:10px 15px}
 }
 @media(max-width:400px){ .brand .sub{display:none} }
+/* At the narrowest phone width the three filter pills come to 291px against
+   280px of usable page, so "Co-curricular" drops to a second line. Trimming the
+   side padding brings them back onto one row; the vertical padding is untouched,
+   so the tap target stays 36px tall.
+   This has to sit AFTER the max-width:760px block above, not beside the other
+   .tpill rules further up — both are plain media queries of equal specificity,
+   so the later one wins and an earlier copy of this was simply ignored. */
+@media(max-width:360px){ .tpill{padding:10px 11px} }

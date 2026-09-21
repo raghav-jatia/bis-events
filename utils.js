@@ -232,6 +232,12 @@ const SCHEME_MAX_PLACES = 10;
  *   problem — a plain-English reason, or null if it is fine (or blank)
  *   blank   — true when the cell is simply empty, which some callers allow
  */
+/** "1, 0, 500 and 100" — so a list of places reads as a sentence. */
+function joinNumbers(numbers) {
+  if (numbers.length <= 1) return numbers.join("");
+  return numbers.slice(0, -1).join(", ") + " and " + numbers[numbers.length - 1];
+}
+
 function readScheme(text) {
   const value = String(text == null ? "" : text).trim();
 
@@ -290,15 +296,33 @@ function readScheme(text) {
   // --- 4. never worth MORE for a lower place ---
   for (let i = 1; i < numbers.length; i++) {
     if (numbers[i] > numbers[i - 1]) {
+      // Show the maintainer what THEIR cell was read as, not a stock example.
+      // The message used to quote "1,000,500,100" whatever had actually been
+      // typed, which read as a non-sequitur against any other value.
+      const reading =
+        '"' + value + '" is read as ' + numbers.length +
+        " separate places worth " + joinNumbers(numbers);
+
+      // The thousands-separator advice is only offered when that plausibly IS
+      // what happened — a group of exactly three digits after the first piece,
+      // as in "1,000". Otherwise the places are simply in the wrong order, and
+      // talking about thousands would send somebody hunting for the wrong fault.
+      const looksLikeThousands = pieces.slice(1).some(function (piece) {
+        return /^\d{3}$/.test(piece.trim());
+      });
+
       return {
         scheme: null,
         blank: false,
         problem:
-          'place ' + (i + 1) + ' is worth more (' + numbers[i] + ') than place ' +
-          i + ' (' + numbers[i - 1] + '), which cannot be right. The usual ' +
-          'cause is writing thousands with commas — "1,000,500,100" is read as ' +
-          'four separate places worth 1, 0, 500 and 100. Write plain numbers ' +
-          'with no thousands separators',
+          "place " + (i + 1) + " is worth more (" + numbers[i] + ") than place " +
+          i + " (" + numbers[i - 1] + "), which cannot be right — " + reading +
+          ". " +
+          (looksLikeThousands
+            ? "If you meant a single number in the thousands, write it without " +
+              "the comma (1000, not 1,000). Otherwise put"
+            : "Put") +
+          " the places in order, highest first",
       };
     }
   }
