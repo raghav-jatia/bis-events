@@ -272,6 +272,35 @@ function tier1SchemeFor(event, config) {
 }
 
 /**
+ * Which Tier-2 scheme does this event use? The event's own `tier2_override` if
+ * one was typed, otherwise Config's `tier2_scheme` for the whole season.
+ * Returns null if neither exists, so the caller can report it rather than
+ * silently scoring zero. Deliberately the same shape as tier1SchemeFor above.
+ *
+ * WHAT THIS CHANGES AND WHAT IT DOES NOT. It changes what one PLACING inside a
+ * category is worth — the gold/silver/bronze values that get added up into the
+ * event's tally. It does not touch Tier 1: however the tally comes out, the
+ * houses are ranked on it and awarded the event's normal Tier-1 scheme (or its
+ * `tier1_override`) exactly as before. An event worth 10/7/4 to the season is
+ * still worth 10/7/4 whatever its categories are scored at.
+ *
+ * It exists for an event whose categories are not all worth the same as
+ * everyone else's — a final worth more than a heat, say — without having to
+ * change the season-wide scheme that every other event depends on.
+ */
+function tier2SchemeFor(event, config) {
+  if (event.tier2Override) {
+    return { scheme: event.tier2Override, source: "tier2_override" };
+  }
+
+  if (config.schemes.tier2) {
+    return { scheme: config.schemes.tier2, source: "tier2_scheme" };
+  }
+
+  return null;
+}
+
+/**
  * Work out one event's Tier-1 house points.
  *
  * CALCULATED events: sum the individual results (Tier 2) → rank the houses on
@@ -308,13 +337,14 @@ function calculateTier1(event, data) {
   let placeGroups = [];
 
   if (event.resultsMode === RESULTS_MODE.CALCULATED) {
-    const tier2Scheme = config.schemes.tier2;
-
     // Same again: a missing tier2_scheme is reported once by validate.js,
-    // against the Config tab, rather than once per affected event.
-    if (!tier2Scheme) return;
+    // against the Config tab, rather than once per affected event — and a
+    // malformed tier2_override is reported against that event's own cell,
+    // having already fallen back to the Config scheme by this point.
+    const tier2SchemeInfo = tier2SchemeFor(event, config);
+    if (!tier2SchemeInfo) return;
 
-    const tier2 = calculateTier2(event, tier2Scheme, houses);
+    const tier2 = calculateTier2(event, tier2SchemeInfo.scheme, houses);
 
     // An event with no results yet must award NOTHING. Without this guard every
     // house would sit on 0, all houses would "tie for first", and everybody

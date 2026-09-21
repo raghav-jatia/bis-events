@@ -63,6 +63,7 @@ Go to the **Events** tab and add a row:
 - **status** — `Upcoming` to start (dropdown). See "Change an event's status" below for all four.
 - **results_mode** — how the house points get worked out. Leave it **blank until the event happens**; you only need it once you're entering results. The three choices are explained under "Enter results" below.
 - **tier1_override** — leave **blank** normally. Only fill it (e.g. `12,8,4`) if *this* event uses a non-standard house-point scheme.
+- **tier2_override** — leave **blank** normally. Only fill it (e.g. `10,7,4`) if the *individual winners inside this one event* are worth more or less than usual. See "The two override columns" below.
 - **venue**, **writeup**, **result_note**, **minisite_url** — all optional, all explained below. Anything left blank simply doesn't appear on the site.
 - Leave the results blank for now — you'll add them after the event.
 
@@ -97,6 +98,25 @@ Occasionally the official house order is decided by a person — a head judge, a
 | `Calculated` | Most sports — you have individual results per category | The site adds up the Results tab |
 | `Direct` | Most co-curriculars — you only know which house won | The direct_1st/2nd/3rd cells |
 | `Override` | A judge set the house order by hand | The direct_1st/2nd/3rd cells |
+
+### The two override columns — `tier1_override` and `tier2_override`
+
+**Leave both blank unless somebody has told you otherwise.** Almost every event uses the school's normal point schemes, and blank means "use the normal ones". They exist for the occasional event that genuinely isn't worth the same as the rest.
+
+Points are worked out in two steps, and each column changes one of them:
+
+| Column | Changes | Example |
+|---|---|---|
+| **tier2_override** | What each **individual winner inside this event** is worth while the site adds up the Results tab | `10,7,4` — a gold in this event's categories is worth 10 instead of the usual 5 |
+| **tier1_override** | What the **houses** get for this event once they've been placed 1st/2nd/3rd | `12,8,4` — winning this event is worth 12 to the season instead of the usual 10 |
+
+**The two are independent.** `tier2_override` changes the tally that decides *which house came 1st*; it does **not** change what coming 1st is worth. An event is still worth its normal 10/7/4 to the season unless you also set `tier1_override`.
+
+`tier2_override` only does something on a **Calculated** event, because that's the only mode where the site adds up individual results. On a `Direct` or `Override` event it is ignored.
+
+**How to type it:** plain numbers, single commas, **highest first** — `10,7,4`. Decimals are fine (`2.5,1.5,0.5`). Two places worth the same is fine (`5,5,3`).
+
+**What happens if you get it wrong:** nothing silently. The site refuses a scheme it can't trust, scores the event with the normal scheme instead, and says exactly what's wrong in `?debug`, naming the event and the column. It rejects a missing value between commas (`10,,4`), words (`ten,seven,four`), a scheme that goes *up* (`1,2,3` — bronze can't beat gold), and thousands separators (`1,000` is read as two places worth 1 and 0).
 
 ### Team events (no individual names)
 For football, basketball and the like there's no individual winner — only a house. On the **Results** tab, leave **gold_name** blank and just fill **gold_house**. The site shows the **house name** in that cell instead of an empty space. You can mix the two in one event (an individual sprint alongside a team relay) and each row reads correctly.
@@ -161,9 +181,9 @@ At the end of a season:
 3. On **Config**, update `season_label` and `current_year` to the new season.
 
 > ⚠️ **If you ever change a point scheme** (`sports_scheme`, `cocurricular_scheme`,
-> `tier2_scheme`, or an event's `tier1_override`), write it as plain numbers
-> separated by single commas, highest first: `10,7,4`. Decimals are fine
-> (`3.5,2.25,1`).
+> `tier2_scheme`, or an event's `tier1_override` / `tier2_override`), write it as
+> plain numbers separated by single commas, highest first: `10,7,4`. Decimals are
+> fine (`3.5,2.25,1`).
 > **Do not** use thousands separators (`1,000` is read as two places worth 1 and 0),
 > semicolons, or spare commas. The site now refuses a scheme it cannot trust and
 > says exactly what is wrong in the `?debug` view — but a scheme is the one cell

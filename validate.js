@@ -403,7 +403,7 @@ function checkEvents(data, report, knownHouseIds) {
     checkEventName(event, report);
     checkEventDropdowns(event, report, allowedStatuses, allowedTypes, allowedModes);
     checkEventDate(event, report);
-    checkEventTier1Override(event, report);
+    checkEventSchemeOverrides(event, report);
 
     // Clean the scoring data. Order matters: placings are cleaned before we
     // ask whether a completed event has any placings left.
@@ -513,31 +513,55 @@ function checkEventDropdowns(event, report, allowedStatuses, allowedTypes, allow
 }
 
 /**
- * tier1_override — a per-event point scheme, and the second place a malformed
+ * The two per-event point schemes — and the second and third places a malformed
  * scheme can do damage.
  *
- * It is checked exactly as strictly as the Config schemes, because the failure
- * is the same shape: a stray comma here would not break the page, it would
- * quietly award this one event's points in the wrong order. The only difference
- * is that BLANK is perfectly normal here — almost every event uses the default
- * scheme for its type — so a blank cell says nothing at all.
+ *   tier1_override → what this event is worth to the SEASON, by house position.
+ *   tier2_override → what one PLACING inside this event's categories is worth.
+ *
+ * Both are checked exactly as strictly as the Config schemes, because the
+ * failure is the same shape every time: a stray comma here would not break the
+ * page, it would quietly award points in the wrong order. The only difference
+ * from Config is that BLANK is perfectly normal here — almost every event uses
+ * the season defaults — so a blank cell says nothing at all.
+ *
+ * ONE function for both, rather than a copy each, so "as strict as Config"
+ * cannot drift apart between the two columns. If a third override is ever
+ * added, it joins this list and inherits the same rules for free.
  */
-function checkEventTier1Override(event, report) {
-  const typed = String(event.tier1OverrideRaw || "").trim();
-  if (typed === "") return; // the normal case: use the default for the type
+const EVENT_SCHEME_OVERRIDES = [
+  {
+    column: "tier1_override",
+    rawField: "tier1OverrideRaw",
+    fallback:
+      "This event has been scored with the normal scheme for its type instead.",
+  },
+  {
+    column: "tier2_override",
+    rawField: "tier2OverrideRaw",
+    fallback:
+      "This event's categories have been tallied with the Config tier2_scheme " +
+      "instead.",
+  },
+];
 
-  const problem = describeSchemeProblem(typed);
-  if (!problem) return;
+function checkEventSchemeOverrides(event, report) {
+  EVENT_SCHEME_OVERRIDES.forEach(function (override) {
+    const typed = String(event[override.rawField] || "").trim();
+    if (typed === "") return; // the normal case: use the season default
 
-  report.add(
-    VALIDATION_LEVEL.ERROR,
-    "Events",
-    event.id,
-    'The tier1_override "' + typed + '" cannot be used because ' + problem +
-      ". This event has been scored with the normal scheme for its type " +
-      "instead. Either fix it or clear the cell.",
-    "tier1_override"
-  );
+    const problem = describeSchemeProblem(typed);
+    if (!problem) return;
+
+    report.add(
+      VALIDATION_LEVEL.ERROR,
+      "Events",
+      event.id,
+      "The " + override.column + ' "' + typed + '" cannot be used because ' +
+        problem + ". " + override.fallback + " Either fix it or clear the cell.",
+      override.column
+    );
+  });
 }
 
 /**

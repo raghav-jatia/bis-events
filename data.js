@@ -609,6 +609,14 @@ function buildEvents(eventRows, tier2ByEvent, rosterByEvent, photosByEvent, hous
       // becomes null above, and validate.js needs the original text to explain
       // what is wrong with it.
       tier1OverrideRaw: row.tier1_override || "",
+
+      // The same idea one tier down: what each individual PLACING inside this
+      // event's categories is worth. null = use Config's tier2_scheme.
+      // Only meaningful when resultsMode = Calculated, because that is the only
+      // mode that tallies category results at all.
+      tier2Override: parseScheme(row.tier2_override),
+      tier2OverrideRaw: row.tier2_override || "",
+
       directPlacings: directPlacings, // only meaningful when resultsMode = Direct
 
       // --- PLACEHOLDER: filled in by calculate.js ---
