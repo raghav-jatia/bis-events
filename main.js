@@ -13,12 +13,19 @@
 // message. A visitor never sees a raw error or a broken page.
 
 /**
- * Everything found by validate.js and calculate.js, kept together so the
- * ?debug view (still to be built) can list it on screen for a maintainer.
+ * Everything validate.js found, kept together so the ?debug view can list it on
+ * screen for a maintainer who will never open the browser console.
  */
 let siteWarnings = [];
 
-/** The finished data object, kept so a view can be drawn on demand. */
+/**
+ * The finished data object.
+ *
+ * The site itself doesn't read this — navigation.js is handed its own reference
+ * when main.js hands over. It is kept as a global purely so that anyone
+ * debugging can type `siteData` into the browser console and inspect exactly
+ * what the site is working from.
+ */
 let siteData = null;
 
 /**
@@ -57,8 +64,13 @@ async function startSite() {
   showOnly("loading");
 
   try {
-    // 1. LOAD — the only network request the site makes.
-    const loaded = await loadSiteData();
+    // 1. LOAD — the only network requests the site makes: one per tab.
+    //
+    //    In ?debug ONLY, each tab is fetched a second time by the other route,
+    //    so the panel can say whether rows are hidden or filtered in the Sheet.
+    //    That answer is for maintainers and appears nowhere else, so an ordinary
+    //    visitor must never pay for it — hence the flag rather than always on.
+    const loaded = await loadSiteData({ compareSheetView: isDebugRequested() });
 
     // 2. VALIDATE — set aside anything unusable, and collect the warnings.
     const checked = validateSiteData(loaded);
@@ -72,6 +84,9 @@ async function startSite() {
         "drawn. See the errors above."
       );
       showFallback();
+      // A maintainer using ?debug needs the panel MOST in this situation, so it
+      // is drawn even though the site itself cannot be.
+      renderDebugPanel(checked.data, siteWarnings);
       return;
     }
 
@@ -80,9 +95,21 @@ async function startSite() {
     siteWarnings = siteWarnings.concat(scored.warnings);
     siteData = scored.data;
 
+    // 3b. CHECK THE RESULT — a few problems can only be spotted once the maths
+    //     has an answer to compare against (e.g. an event whose typed house
+    //     order disagrees with the one its Results add up to). Reporting is
+    //     still validate.js's job; this file only decides when it happens.
+    siteWarnings = siteWarnings.concat(validateScoredData(scored.data));
+
     // 4. RENDER — draw the result. Every view is drawn once, up front, from the
     //    same data object. (Event Detail is the exception: it is drawn when a
     //    particular event is opened, because which event it shows is a choice.)
+    //
+    //    The chrome goes first, on its own: the header and the footer line
+    //    belong to no single view, and drawing them here rather than inside
+    //    renderHomepage means they cannot go missing if the visitor arrives on
+    //    a deep link to some other view.
+    renderSiteChrome(scored.data);
     renderHomepage(scored.data);
     renderCompletedEvents(scored.data);
     renderCalendar(scored.data);
@@ -92,9 +119,29 @@ async function startSite() {
     //    screen from here on and wires up every link, row and button.
     initNavigation(scored.data);
 
-    if (siteWarnings.length > 0) {
+    // Diagnostics for maintainers. Draws nothing at all unless "?debug" is in
+    // the address, so an ordinary visit is completely unaffected.
+    renderDebugPanel(scored.data, siteWarnings);
+
+    // 6. PHOTOS — these were never awaited, so the page above is already on
+    //    screen. When Drive answers, each event's photos are in place; redraw
+    //    the Event Detail page only if the visitor is already looking at one.
+    if (scored.data.photosReady) {
+      scored.data.photosReady.then(function () {
+        refreshCurrentDetailView();
+      });
+    }
+
+    // Advisories are hunches kept back for the ?debug view, so they are not
+    // counted here — otherwise a clean load would still report a number and
+    // imply something needs fixing.
+    const realProblems = siteWarnings.filter(function (entry) {
+      return entry.level !== "advisory";
+    });
+
+    if (realProblems.length > 0) {
       console.log(
-        "main.js: the page rendered with " + siteWarnings.length +
+        "main.js: the page rendered with " + realProblems.length +
         " data warning(s) — see above."
       );
     }
@@ -102,6 +149,24 @@ async function startSite() {
     // The Sheet is unreachable, or something genuinely unexpected happened.
     console.error("main.js: could not build the page.", error);
     showFallback();
+
+    // Nothing reached validate.js, so there are no warnings to show — but a
+    // maintainer who added ?debug still needs to be told WHY the page is blank.
+    // Record this one failure in the shape the panel expects, so the reason is
+    // on screen rather than only in the console.
+    siteWarnings = siteWarnings.concat([
+      {
+        level: VALIDATION_LEVEL.FATAL,
+        tab: "Sheet",
+        subject: "",
+        cell: "",
+        message:
+          "The Google Sheet could not be read, so nothing could be drawn. " +
+          "Check the workbook is still shared as \"anyone with the link can " +
+          "view\", and that you are online. (" + error.message + ")",
+      },
+    ]);
+    renderDebugPanel(null, siteWarnings);
   }
 }
 

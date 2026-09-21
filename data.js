@@ -9,9 +9,11 @@
 //
 // What this file does NOT do:
 //   - No points maths. Not one addition. That is calculate.js's job.
-//   - No DOM, no HTML, no colours-on-screen. That is render.js's job.
-//   - No hard validation. Bad rows are carried through as-is (with a warning)
-//     so validate.js can decide what to skip.
+//   - No DOM, no HTML, no colours-on-screen. That is the render files' job.
+//   - No validation and no complaining. Bad rows are carried through exactly as
+//     they arrived, and validate.js decides what to skip and what to report.
+//     This file does not even warn about them: it would be reporting the same
+//     fault validate.js reports properly, naming the tab, row and column.
 //
 // Public entry point: loadSiteData()  →  Promise<canonical data object>
 
@@ -139,6 +141,25 @@ function gridToObjects(grid) {
 }
 
 /**
+ * The column names a tab actually arrived with, normalised the same way
+ * gridToObjects normalises them.
+ *
+ * Worth keeping separately because the row objects can't answer the question.
+ * A column that is present but empty and a column that is absent altogether
+ * both read as "" on every row — yet one is a blank cell and the other is a
+ * whole field the site has silently stopped seeing. validate.js needs to tell
+ * those two apart, and only the header row can.
+ */
+function gridColumns(grid) {
+  if (grid.length === 0) return [];
+  return grid[0]
+    .map(normaliseHeader)
+    .filter(function (key) {
+      return key !== "";
+    });
+}
+
+/**
  * Header names are normalised so small typing differences in the Sheet don't
  * break the site: "Event ID", "event_id" and " EVENT_ID " all become "event_id".
  */
@@ -158,19 +179,28 @@ function cleanCell(rawValue) {
 // SECTION 2 — fetching the tabs
 // =====================================================================
 
+/** The primary route: the plain CSV export, addressed by the tab's gid. */
+function tabUrlByGid(tab) {
+  return SHEET_EXPORT_BASE_URL + "&gid=" + encodeURIComponent(tab.gid);
+}
+
 /**
- * Fetch one tab and return it as a list of row-objects.
+ * The fallback route: gviz, addressed by tab name.
  *
  * The "&headers=1" is important and easy to lose: without it Google *guesses*
  * how many header rows there are, and on a text-only tab like Config it guesses
  * wrong — it swallows the first several data rows into the header.
  */
-async function fetchTab(tabName) {
-  const url =
+function tabUrlByName(tab) {
+  return (
     SHEET_CSV_BASE_URL +
     "?tqx=out:csv&headers=1&sheet=" +
-    encodeURIComponent(tabName);
+    encodeURIComponent(tab.name)
+  );
+}
 
+/** Fetch one URL as CSV text, turning every kind of failure into a clear error. */
+async function fetchCsv(url, tabName) {
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -191,32 +221,166 @@ async function fetchTab(tabName) {
     );
   }
 
-  return gridToObjects(parseCsv(text));
+  return text;
+}
+
+/** CSV text → the rows the site works from, plus the columns they came with. */
+function parseTab(text) {
+  const grid = parseCsv(text);
+  return { rows: gridToObjects(grid), columns: gridColumns(grid) };
+}
+
+/**
+ * Fetch one tab, by gid if we have one and by name if we don't.
+ *
+ * WHY THE GID COMES FIRST. Reading by name goes through gviz, which quietly
+ * drops hidden or filtered-out rows and blanks any cell that doesn't match the
+ * type it guessed for the column (config.js has the measurements). Neither shows
+ * up anywhere on the page: the site just computes from less data than the Sheet
+ * holds. Reading by gid is the ordinary CSV download and has neither problem.
+ *
+ * The name route is kept as a safety net rather than dropped, because a gid can
+ * legitimately stop working — delete a tab and retype it and it gets a new one —
+ * and losing the whole tab would be a worse failure than reading it the old way.
+ * Whenever that happens we record a note, so the compromise is never silent.
+ *
+ * Returns { rows, columns, note } — note is null on the normal path.
+ */
+async function fetchTab(tab) {
+  if (tab.gid) {
+    try {
+      const result = parseTab(await fetchCsv(tabUrlByGid(tab), tab.name));
+      result.note = null;
+      return result;
+    } catch (gidError) {
+      // The gid didn't work. Try the name before giving up — but say so.
+      const result = parseTab(await fetchCsv(tabUrlByName(tab), tab.name));
+      result.note = {
+        tab: tab.name,
+        reason:
+          "its gid (" + tab.gid + ") no longer works, so it was read by name " +
+          "instead. (" + gidError.message + ")",
+      };
+      return result;
+    }
+  }
+
+  const result = parseTab(await fetchCsv(tabUrlByName(tab), tab.name));
+  result.note = {
+    tab: tab.name,
+    reason: "no gid is recorded for it in config.js, so it was read by name.",
+  };
+  return result;
 }
 
 // =====================================================================
-// SECTION 3 — small shared helpers
+// SECTION 2b — event photos, from Drive (blueprint §9)
 // =====================================================================
-// (These are deliberately tiny. When utils.js is created they can move there.)
 
-/** "10,7,4" → [10, 7, 4]. Anything unparseable → null, so callers can fall back. */
-function parseScheme(text) {
-  if (!text) return null;
-  const numbers = text.split(",").map(function (part) {
-    return Number(part.trim());
-  });
-  const allValid = numbers.length > 0 && numbers.every(function (n) {
-    return Number.isFinite(n);
-  });
-  return allValid ? numbers : null;
+/**
+ * Fetch a URL, but give up after a set time.
+ *
+ * Without this a slow or hanging photo script would keep the page waiting
+ * indefinitely. AbortController lets us walk away.
+ */
+async function fetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(function () {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-/** Safe number parse. Returns null (never NaN) so bad data is obvious downstream. */
-function parseNumber(text) {
-  if (text === "" || text == null) return null;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : null;
+/**
+ * Ask the Apps Script for one event's photos.
+ *
+ * Always resolves — never rejects. A missing folder, a script that is down, a
+ * network blip, a timeout: all of them come back as an empty list plus a
+ * console note. Photos are decoration, and decoration must never take a page
+ * down with it.
+ */
+async function fetchPhotosForFolder(eventId, folderLink) {
+  const separator = PHOTO_SCRIPT_URL.indexOf("?") === -1 ? "?" : "&";
+  const url = PHOTO_SCRIPT_URL + separator + "folder=" + encodeURIComponent(folderLink);
+
+  try {
+    const response = await fetchWithTimeout(url, PHOTO_FETCH_TIMEOUT_MS);
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    const payload = await response.json();
+
+    // The script answers with { ok: false, error: "..." } for ordinary
+    // problems like a folder nobody shared. That is information, not a crash.
+    if (!payload || payload.ok !== true) {
+      console.warn(
+        'data.js: no photos for event "' + eventId + '" — ' +
+        ((payload && payload.error) || "the photo script gave no answer.")
+      );
+      return [];
+    }
+
+    return (payload.photos || []).map(function (photo) {
+      return {
+        url: photo.url || "",
+        // Google has changed which Drive address works for embedding more than
+        // once; render-detail.js tries this if the first one fails to load.
+        fallbackUrl: photo.fallbackUrl || "",
+        // The filename stands in as the caption when nobody wrote one.
+        caption: photo.name || "",
+      };
+    });
+  } catch (error) {
+    const reason = error.name === "AbortError"
+      ? "the photo script took too long to answer"
+      : error.message;
+    console.warn(
+      'data.js: could not load photos for event "' + eventId + '" — ' + reason +
+      ". The rest of the page is unaffected."
+    );
+    return [];
+  }
 }
+
+/**
+ * Load photos for every event that names a Drive folder, all at once.
+ *
+ * Events without a photo_folder are not asked about at all. If the script URL
+ * has not been configured yet, nothing is requested and the feature is simply
+ * dormant.
+ *
+ * The results are written straight onto the events. Folder photos REPLACE the
+ * rows from the Photos tab, because the folder is the primary route; if the
+ * folder yields nothing, whatever the Photos tab provided is left in place as
+ * the fallback.
+ */
+async function loadEventPhotos(events) {
+  if (!PHOTO_SCRIPT_URL) return;
+
+  const eventsWithFolders = events.filter(function (event) {
+    return event.photoFolder;
+  });
+  if (eventsWithFolders.length === 0) return;
+
+  await Promise.all(
+    eventsWithFolders.map(async function (event) {
+      const photos = await fetchPhotosForFolder(event.id, event.photoFolder);
+      if (photos.length > 0) {
+        event.photos = photos;
+      }
+    })
+  );
+}
+
+// =====================================================================
+// SECTION 3 — matching Sheet text to houses
+// =====================================================================
+// (The number parsers this section used to hold — parseScheme and parseNumber —
+// now live in utils.js, which is where shared parsing belongs.)
 
 /**
  * The Sheet's placing columns hold house NAMES ("Beta"), because that's what the
@@ -228,6 +392,12 @@ function parseNumber(text) {
  *
  * Unrecognised text is kept as `houseRaw` with `houseId: null` rather than
  * thrown away — validate.js decides what to do about it, not this file.
+ *
+ * Deliberately SILENT about a name it doesn't recognise. validate.js reports
+ * exactly that fault already, and reports it far better: it knows whether the
+ * name was in a result, a roster or an extra-points row, and it names the tab,
+ * the row and the column to go and fix. Warning here as well would put the same
+ * mistake in the console twice, in two different wordings.
  */
 function resolveHouses(cellText, houseLookup) {
   if (!cellText) return [];
@@ -235,11 +405,6 @@ function resolveHouses(cellText, houseLookup) {
   return cellText.split(",").map(function (token) {
     const raw = token.trim();
     const match = houseLookup[raw.toLowerCase()];
-    if (!match) {
-      console.warn(
-        'data.js: "' + raw + '" does not match any house in the Houses tab.'
-      );
-    }
     return { houseId: match ? match.id : null, houseRaw: raw };
   });
 }
@@ -373,6 +538,11 @@ function buildRosterByEvent(rosterRows, houseLookup) {
       houseId: house ? house.houseId : null,
       houseRaw: house ? house.houseRaw : "",
       name: row.participant_name || "",
+      // Optional age/section grouping, e.g. "Under 14". The column may not
+      // exist in the Sheet at all, which simply reads as "" — and an event
+      // whose roster rows are all blank here renders as one flat list per
+      // house, exactly as before this column existed.
+      category: row.category || "",
     });
   });
 
@@ -435,6 +605,10 @@ function buildEvents(eventRows, tier2ByEvent, rosterByEvent, photosByEvent, hous
 
       // --- inputs the points engine needs ---
       tier1Override: parseScheme(row.tier1_override), // null = use the default by type
+      // The cell exactly as typed. Kept because a scheme that FAILS to parse
+      // becomes null above, and validate.js needs the original text to explain
+      // what is wrong with it.
+      tier1OverrideRaw: row.tier1_override || "",
       directPlacings: directPlacings, // only meaningful when resultsMode = Direct
 
       // --- PLACEHOLDER: filled in by calculate.js ---
@@ -453,6 +627,11 @@ function buildEvents(eventRows, tier2ByEvent, rosterByEvent, photosByEvent, hous
       // Optional link to this event's live mini-site. The column may not exist
       // in the Sheet at all, which simply reads as "" and hides the section.
       minisiteUrl: row.minisite_url || "",
+
+      // Optional free-text note shown with the results — e.g. explaining why a
+      // house order was set by hand, or a scoring quirk worth mentioning.
+      // Plain text only: unlike `writeup` it takes no <highlight> markup.
+      resultNote: row.result_note || "",
     };
   });
 }
@@ -508,32 +687,218 @@ function buildExtraPoints(extraRows, houseLookup) {
 // =====================================================================
 
 /**
+ * Which tabs the site cannot live without, and which it can manage without.
+ *
+ * WHY THE DISTINCTION. Without Config there are no point schemes, without
+ * Houses there is nobody to score, and without Events there is nothing to show:
+ * any of those missing means there is no site, so they are fatal. Everything
+ * else only makes the page *less complete*, and taking the whole site down
+ * because a decorative tab is missing would be a worse failure than the one it
+ * is reacting to.
+ *
+ * `affectsPoints` says how loudly validate.js should complain: losing Results
+ * or Extra Points changes the standings and is an error; losing Rosters only
+ * removes something from a page and is a warning.
+ */
+const SHEET_TAB_PLAN = [
+  { key: "config",  tab: SHEET_TABS.CONFIG,       required: true },
+  { key: "houses",  tab: SHEET_TABS.HOUSES,       required: true },
+  { key: "events",  tab: SHEET_TABS.EVENTS,       required: true },
+  { key: "results", tab: SHEET_TABS.RESULTS,      required: false, affectsPoints: true },
+  { key: "extra",   tab: SHEET_TABS.EXTRA_POINTS, required: false, affectsPoints: true },
+  { key: "rosters", tab: SHEET_TABS.ROSTERS,      required: false, affectsPoints: false },
+  // No Photos entry: the tab is deliberately not fetched while the photos
+  // feature is dormant. config.js explains why and how to put it back.
+];
+
+/**
+ * Fetch every tab at once, and survive the loss of an optional one.
+ *
+ * allSettled rather than all: Promise.all rejects the moment ANY request fails,
+ * which used to mean that deleting the unused Photos tab took the entire site
+ * down. Now a failed optional tab simply arrives as no rows, and the reason is
+ * recorded for validate.js to report.
+ *
+ * A failed REQUIRED tab still throws, because there is genuinely nothing to
+ * draw — main.js turns that into the calm fallback message (blueprint §17).
+ *
+ * Returns { rows, columns, tabErrors, tabNotes, viewDifferences }.
+ *
+ * `compareSheetView` asks for the extra diagnostic pass described under
+ * fetchTabAsViewed — OFF for ordinary visitors, and only ever switched on for
+ * ?debug, so a normal page load makes exactly one request per tab.
+ */
+async function fetchAllTabs(compareSheetView) {
+  // Both sets of requests are started BEFORE either is awaited, so the
+  // diagnostic pass runs alongside the real one rather than after it.
+  const mainRequests = Promise.allSettled(
+    SHEET_TAB_PLAN.map(function (plan) {
+      return fetchTab(plan.tab);
+    })
+  );
+
+  const viewRequests = compareSheetView
+    ? Promise.allSettled(
+        SHEET_TAB_PLAN.map(function (plan) {
+          return fetchTabAsViewed(plan.tab);
+        })
+      )
+    : Promise.resolve([]);
+
+  const bothSets = await Promise.all([mainRequests, viewRequests]);
+  const settled = bothSets[0];
+  const viewSettled = bothSets[1];
+
+  const rows = {};
+  const columns = {};
+  const tabErrors = [];
+  const tabNotes = [];
+
+  settled.forEach(function (outcome, index) {
+    const plan = SHEET_TAB_PLAN[index];
+
+    if (outcome.status === "fulfilled") {
+      rows[plan.key] = outcome.value.rows;
+      // Keyed by the tab's NAME, because that is what validate.js reports and
+      // what the maintainer sees on the tab at the bottom of the workbook.
+      columns[plan.tab.name] = outcome.value.columns;
+      if (outcome.value.note) {
+        tabNotes.push({
+          tab: plan.tab.name,
+          affectsPoints: plan.affectsPoints === true,
+          required: plan.required === true,
+          reason: outcome.value.note.reason,
+        });
+      }
+      return;
+    }
+
+    const reason = (outcome.reason && outcome.reason.message) || String(outcome.reason);
+
+    if (plan.required) {
+      throw new Error(
+        'The "' + plan.tab.name + '" tab could not be read, and the site cannot ' +
+        "run without it. " + reason
+      );
+    }
+
+    // Optional tab: carry on with nothing from it, and remember why.
+    rows[plan.key] = [];
+    columns[plan.tab.name] = [];
+    tabErrors.push({
+      tab: plan.tab.name,
+      affectsPoints: plan.affectsPoints === true,
+      message: reason,
+    });
+  });
+
+  return {
+    rows: rows,
+    columns: columns,
+    tabErrors: tabErrors,
+    tabNotes: tabNotes,
+    viewDifferences: compareViews(viewSettled, rows, tabNotes),
+  };
+}
+
+/**
+ * Read a tab the way the SHEET IS BEING VIEWED, rather than the way it is
+ * stored: through gviz, which omits rows that are hidden or filtered out.
+ *
+ * This is not how the site gets its data — it is the opposite of that, and
+ * deliberately so. Fetching a tab BOTH ways and comparing the two row counts is
+ * the only way to notice that somebody has left a filter on, because the real
+ * route (by gid) correctly ignores filters and therefore cannot tell.
+ *
+ * Nothing here is ever used to build the page. It exists purely so ?debug can
+ * tell a maintainer "your view of the Sheet is not what the site sees" — which
+ * costs them nothing but is confusing if nobody says it.
+ */
+async function fetchTabAsViewed(tab) {
+  return parseTab(await fetchCsv(tabUrlByName(tab), tab.name));
+}
+
+/**
+ * Compare what the site read against what the Sheet currently shows.
+ *
+ * ROWS ONLY, and deliberately so. A HIDDEN COLUMN cannot be detected this way
+ * and there is no point trying: hiding a column does not remove it from either
+ * route — measured both ways round, with `venue` hidden and again with
+ * `direct_1st` hidden, and the column arrived complete every time. So the two
+ * column lists are always identical, a comparison of them could never fire, and
+ * a check that can never fire is worse than no check because it reads like
+ * cover that isn't there. (Hiding a column has no effect on the site either,
+ * which is why nothing needs to report it. A column genuinely renamed or
+ * deleted IS caught — that is checkMissingColumns in validate.js, and it works
+ * on the headers themselves rather than on this comparison.)
+ *
+ * Only ever reports the SITE having MORE rows than the view. The reverse would
+ * mean gviz found rows the export didn't, which cannot happen from hiding — and
+ * a row whose cells all fail gviz's column-type guess could produce it, so
+ * reporting that direction would be crying wolf.
+ *
+ * Returns [] when the comparison wasn't asked for, which is the normal case.
+ */
+function compareViews(viewSettled, rows, tabNotes) {
+  if (viewSettled.length === 0) return [];
+
+  // A tab that fell back to the name route was ALREADY read through gviz, so
+  // comparing it with gviz would only ever compare it with itself.
+  const readByName = {};
+  tabNotes.forEach(function (note) {
+    readByName[note.tab] = true;
+  });
+
+  const differences = [];
+
+  viewSettled.forEach(function (outcome, index) {
+    const plan = SHEET_TAB_PLAN[index];
+    const tabName = plan.tab.name;
+
+    // The diagnostic pass is allowed to fail without consequence: it informs
+    // nothing on the page, so a failure is simply "no comparison available".
+    if (outcome.status !== "fulfilled") return;
+    if (readByName[tabName]) return;
+
+    const siteRows = (rows[plan.key] || []).length;
+    const viewedRows = outcome.value.rows.length;
+
+    if (siteRows > viewedRows) {
+      differences.push({
+        tab: tabName,
+        siteRows: siteRows,
+        viewedRows: viewedRows,
+      });
+    }
+  });
+
+  return differences;
+}
+
+/**
  * Load everything and return the canonical site data object (blueprint §5).
  *
  * This is the only function anything else in the site should call, and the only
- * place a network request is made. Rejects if the Sheet cannot be read at all —
- * main.js turns that into the calm fallback message described in blueprint §17.
+ * place a network request is made. Rejects only if a REQUIRED tab cannot be
+ * read — main.js turns that into the calm fallback message (blueprint §17).
  */
-async function loadSiteData() {
-  // All seven tabs are fetched at the same time rather than one after another,
+async function loadSiteData(options) {
+  // All six tabs are fetched at the same time rather than one after another,
   // so the page waits for the slowest single request, not the sum of them.
-  const [
-    configRows,
-    houseRows,
-    eventRows,
-    resultRows,
-    extraRows,
-    rosterRows,
-    photoRows,
-  ] = await Promise.all([
-    fetchTab(SHEET_TABS.CONFIG),
-    fetchTab(SHEET_TABS.HOUSES),
-    fetchTab(SHEET_TABS.EVENTS),
-    fetchTab(SHEET_TABS.RESULTS),
-    fetchTab(SHEET_TABS.EXTRA_POINTS),
-    fetchTab(SHEET_TABS.ROSTERS),
-    fetchTab(SHEET_TABS.PHOTOS),
-  ]);
+  const loaded = await fetchAllTabs(!!(options && options.compareSheetView));
+
+  const configRows = loaded.rows.config;
+  const houseRows  = loaded.rows.houses;
+  const eventRows  = loaded.rows.events;
+  const resultRows = loaded.rows.results;
+  const extraRows  = loaded.rows.extra;
+  const rosterRows = loaded.rows.rosters;
+
+  // The Photos TAB is not fetched (config.js explains why), so there are never
+  // any rows from it. The rest of the photos code is untouched and still works:
+  // this is simply the empty list it would have received anyway, and the Drive
+  // route below is independent of the tab.
+  const photoRows  = [];
 
   // Houses must be built first: everything else translates house names → ids.
   const houses = buildHouses(houseRows);
@@ -565,6 +930,37 @@ async function loadSiteData() {
       rosterByEvent,
       photosByEvent
     ),
+
+    // Optional tabs that would not load. Empty in the normal case. Recorded
+    // rather than reported, because reporting is validate.js's job.
+    tabErrors: loaded.tabErrors,
+
+    // Tabs that loaded, but by the fallback name route rather than by gid — so
+    // they may be missing hidden rows or type-mismatched cells. Empty in the
+    // normal case. Recorded, not reported: validate.js decides how loud to be.
+    tabNotes: loaded.tabNotes,
+
+    // Tab name → the column headers that tab actually arrived with. Kept so
+    // validate.js can spot a key column that has gone missing entirely, which
+    // no amount of looking at the rows would reveal.
+    tabColumns: loaded.columns,
+
+    // Tabs where the Sheet's current VIEW shows less than the site reads —
+    // rows hidden or filtered out, or a hidden column. Nothing is wrong when
+    // this is non-empty; it only means the maintainer's screen and the site
+    // disagree. Empty unless ?debug asked for the comparison.
+    viewDifferences: loaded.viewDifferences,
+
+    // Photos are fetched from Drive SEPARATELY and deliberately NOT awaited
+    // here. The page renders immediately with everything else; when this
+    // promise settles, each event's `photos` array has been filled in.
+    //
+    // It works out neatly because the Event Detail page is drawn at the moment
+    // somebody opens an event, which is almost always well after this has
+    // finished. main.js redraws that page if it happens to be open already.
+    //
+    // It never rejects: loadEventPhotos swallows every failure.
+    photosReady: loadEventPhotos(events),
 
     // --- PLACEHOLDER: filled in by calculate.js ---
     // Becomes { overall:[{houseId,points,rank}], sports:[…], cocurricular:[…],

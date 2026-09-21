@@ -18,11 +18,17 @@
   /* medal tokens */
   --m1:#f5c542; --m2:#c7ced8; --m3:#cd8a4e;
   /* status colours — these belong to STATUSES, not to houses, so they stay
-     fixed even if a house happens to be red or green */
+     fixed even if a house happens to be red or green. Each family is a solid
+     colour with a translucent fill and border; the solid is only defined where
+     something actually paints with it. The base hex is noted in the comment so
+     the family still reads as one colour.
+        orange  #ff9438  Upcoming     pending #5aa9ff  Results Pending
+        done    #25d17c  Completed    live    #ff5158  Live (solid IS used) */
   --teal:#1fd0c4; --teal-dim:rgba(31,208,196,.12); --teal-line:rgba(31,208,196,.4);
-  --orange:#ff9438; --orange-dim:rgba(255,148,56,.14); --orange-line:rgba(255,148,56,.44);
+  --orange-dim:rgba(255,148,56,.14); --orange-line:rgba(255,148,56,.44);
   --live:#ff5158; --live-dim:rgba(255,81,88,.15); --live-line:rgba(255,81,88,.4);
-  --done:#25d17c; --done-dim:rgba(37,209,124,.14); --done-line:rgba(37,209,124,.4);
+  --pending-dim:rgba(90,169,255,.14); --pending-line:rgba(90,169,255,.4);
+  --done-dim:rgba(37,209,124,.14); --done-line:rgba(37,209,124,.4);
   /* event-TYPE icon colours. Like the status colours above these belong to the
      type (Sport / Co-curricular), never to a house, so they stay put even if a
      house is recoloured in the Sheet. */
@@ -32,10 +38,17 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
+/* Every word on this site comes from a spreadsheet, so any of it could be a
+   very long unbroken string — a pasted URL, a run-together name. Without this
+   a single such value makes the WHOLE PAGE scroll sideways. "anywhere" breaks
+   inside a word only when there is no other way to fit it, so ordinary text
+   still wraps at spaces exactly as before.
+   Tables are excluded on purpose: they already scroll inside their own
+   .scroller box, which is the behaviour we want for a wide table. */
+body :not(table):not(thead):not(tbody):not(tr):not(th):not(td){overflow-wrap:anywhere}
 body{font-family:var(--body);background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
      background-image:radial-gradient(900px 380px at 50% -120px,rgba(247,184,27,.10),transparent 70%)}
-h1,h2,h3,h4,.disp{font-family:var(--disp);letter-spacing:-.01em}
-.num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
 svg.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -74,6 +87,64 @@ nav.main a.active::after{content:"";position:absolute;left:13px;right:13px;botto
 main{padding-bottom:64px}
 .foot-spacer{height:80px}
 
+/* ---- ?debug diagnostics panel (blueprint §17) ----
+   A tool, not a showcase: plain, dense and scannable. It borrows the site's
+   dark/gold palette so it doesn't look broken, but nothing here is decorative. */
+.debugpanel{margin:20px 0 8px;border:1px solid var(--line);border-radius:12px;
+  background:var(--bg2);padding:16px 18px;font-size:13.5px}
+.dbg-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:1px solid var(--line)}
+.dbg-head h2{font-size:15px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--gold2)}
+.dbg-note{font-size:12px;color:var(--muted2)}
+.debugpanel code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+  background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px;color:#e2e7f0}
+
+.dbg-stats{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.dbg-stat{display:flex;align-items:baseline;gap:6px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:7px;padding:5px 10px}
+.dbg-stat span{font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:.05em}
+.dbg-stat b{font-family:var(--num);font-weight:700;font-size:15px;color:var(--ink)}
+.dbg-fetched{font-size:12px;color:var(--muted);margin-bottom:14px}
+
+.dbg-group{margin-top:14px}
+.dbg-grouphead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.dbg-level{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.07em;
+  text-transform:uppercase;padding:2px 9px;border-radius:20px}
+.dbg-fatal{background:#5a1116;color:#ff9aa0}
+.dbg-error{background:#4a1b12;color:#ffab8f}
+.dbg-warning{background:#4a3a10;color:#ffd257}
+.dbg-advisory{background:var(--panel2);color:var(--muted)}
+.dbg-count{font-family:var(--num);font-weight:700;font-size:14px;color:var(--ink)}
+.dbg-blurb{font-size:12px;color:var(--muted2);flex:1;min-width:180px}
+
+.dbg-list{list-style:none;display:grid;gap:8px}
+.dbg-issue{background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:10px 12px}
+.dbg-where{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:5px}
+.dbg-where span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+  padding:2px 7px;border-radius:4px;background:rgba(255,255,255,.05);color:var(--muted)}
+.dbg-where .dbg-tab{color:var(--gold2);background:rgba(247,184,27,.1)}
+.dbg-where .dbg-subject{color:#e2e7f0}
+.dbg-message{color:var(--ink);line-height:1.5}
+.dbg-hint{margin-top:6px;font-size:12.5px;color:#9fd4a8}
+
+/* Advisories are shown open like every other group (nothing in this panel is
+   hidden behind a toggle). They are set apart visually instead, so they read as
+   "worth a glance" rather than as faults sitting alongside real ones. */
+.dbg-advisory-group{border-left:2px solid var(--line);padding-left:13px;
+  margin-top:18px;opacity:.9}
+
+.dbg-clean{background:rgba(37,209,124,.09);border:1px solid var(--done-line);
+  border-radius:8px;padding:14px 16px;color:#7fe3ab;font-weight:600}
+.dbg-foot{margin-top:14px;padding-top:11px;border-top:1px solid var(--line2);
+  font-size:12px;color:var(--muted2);line-height:1.55}
+
+@media(max-width:760px){
+  .debugpanel{padding:14px;font-size:13px}
+  .dbg-stats{gap:6px}
+  .dbg-stat{padding:4px 8px}
+  .dbg-blurb{min-width:100%}
+}
+
 /* Site footer — deliberately quiet. Shown on every view, desktop and mobile. */
 .site-footer{border-top:1px solid var(--line2);padding:20px;text-align:center}
 .stamp-line{font-size:11.5px;color:var(--muted2);letter-spacing:.03em;font-weight:500}
@@ -86,7 +157,43 @@ main{padding-bottom:64px}
 .notice{text-align:center;padding:90px 20px;color:var(--muted)}
 .notice .big{font-family:var(--disp);font-weight:800;font-size:19px;color:var(--ink);margin-bottom:8px}
 
+/* ---- LIVE BANNER (blueprint §14) ----
+   Sits at the very top of the homepage while an event is in progress. The red
+   here is --live, the STATUS colour, deliberately not a house colour: a house
+   recoloured in the Sheet must never restyle "live". */
+.livebanners{display:grid;gap:10px;margin:18px 0 0}
+/* min-width:0 is load-bearing: a grid item refuses to shrink below its content
+   by default, so a very long unbroken event name would stretch the banner (and
+   the whole page) sideways however hard the name inside it tried to clip. */
+.livebanner{min-width:0;display:flex;align-items:center;gap:13px;
+  background:linear-gradient(100deg,rgba(255,81,88,.24),rgba(255,81,88,.07) 58%,var(--bg2));
+  border:1px solid var(--live-line);border-radius:14px;padding:13px 18px;
+  color:inherit;text-decoration:none;cursor:pointer;
+  animation:liveglow 2.8s ease-in-out infinite}
+.livebanner:hover{border-color:rgba(255,81,88,.65)}
+/* A live event whose Detail page would be empty and which has no mini-site:
+   still announced, but nothing about it invites a click. */
+.livebanner.not-clickable{cursor:default}
+.livebanner.not-clickable:hover{border-color:var(--live-line)}
+.livebanner .lb-dot{width:9px;height:9px;border-radius:50%;background:var(--live);flex:none;
+  box-shadow:0 0 10px var(--live);animation:pulse 1.2s infinite}
+.livebanner .lb-tag{font-family:var(--disp);font-weight:900;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:#ff8a8f;flex:none}
+.livebanner .lb-name{font-family:var(--disp);font-weight:800;font-size:16px;color:#fff;
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.livebanner .lb-link{font-family:var(--disp);font-weight:800;font-size:13.5px;color:#ff8a8f;
+  display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap}
+.livebanner:hover .lb-link{color:#ffb3b7}
+/* the soft glow that draws the eye, deliberately slow so it never nags */
+@keyframes liveglow{
+  0%,100%{box-shadow:0 10px 34px -24px rgba(255,81,88,.75)}
+  50%{box-shadow:0 14px 46px -18px rgba(255,81,88,1)}
+}
+
 .hero{text-align:center;padding:52px 0 30px}
+/* Stays nowrap on desktop, which is what keeps the trophy beside the title in
+   the approved design. The phone case is handled in the mobile block below —
+   see the note there. */
 .hero-lockup{display:inline-flex;align-items:center;justify-content:center;gap:22px;text-align:left}
 .hero-trophy{font-size:clamp(48px,8vw,80px);color:var(--gold);display:flex;filter:drop-shadow(0 0 22px var(--gold-glow));flex:none}
 .hero h1{font-size:clamp(32px,6.2vw,64px);font-weight:900;line-height:.96;text-transform:uppercase;letter-spacing:-.02em}
@@ -149,6 +256,32 @@ main{padding-bottom:64px}
 .ecard .erow .rd{color:var(--muted);font-size:12px;white-space:nowrap}
 .ecard .erow .rp{font-family:var(--num);font-weight:700;font-size:15px;color:var(--gold2)}
 
+/* ---- LATEST RESULTS SPOTLIGHT ----
+   A promoted, larger version of the .lcard below. Gold and celebratory, so it
+   reads as a highlight — deliberately unlike the red live banner above it,
+   which is urgent. */
+.spotlights{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.scard{background:linear-gradient(155deg,rgba(247,184,27,.16),rgba(247,184,27,.04) 55%,var(--bg2));
+  border:1px solid rgba(247,184,27,.42);border-radius:18px;padding:20px 22px;
+  display:flex;align-items:center;gap:17px;transition:.15s}
+.scard.clickable{cursor:pointer}
+.scard.clickable:hover{transform:translateY(-2px);
+  box-shadow:0 20px 48px -26px var(--gold-glow);border-color:var(--gold)}
+.scard .cup{width:52px;height:52px;border-radius:14px;
+  background:linear-gradient(135deg,#ffe08a,var(--gold-deep));display:grid;place-items:center;
+  color:#3a2907;font-size:27px;flex:none;box-shadow:0 0 22px var(--gold-glow)}
+.scard .sc-t{flex:1;min-width:0}
+.scard .sc-date{font-family:var(--disp);font-size:11.5px;color:var(--gold2);font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase}
+.scard .sc-name{font-family:var(--disp);font-weight:900;font-size:21px;color:#fff;margin:3px 0 9px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scard .places{display:flex;flex-wrap:wrap;gap:7px 16px}
+.scard .pl{font-family:var(--disp);font-weight:800;font-size:14px;
+  display:inline-flex;align-items:center;gap:7px}
+.scard .pl .rt{width:19px;height:19px;font-size:10px}
+.scard .pl .amp{color:var(--muted);font-weight:700;margin:0 1px}
+.scard .go{color:var(--gold2);font-size:22px;display:flex;flex:none}
+
 .latest{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .lcard{background:linear-gradient(160deg,var(--teal-dim),var(--bg2));border:1px solid var(--teal-line);border-radius:16px;padding:16px 18px;transition:.15s;display:flex;align-items:center;gap:15px}
 /* the .clickable class is added by navigation.js, and ONLY to things it has
@@ -167,12 +300,29 @@ main{padding-bottom:64px}
 
 /* NOT per-house — this is the "next 3 events" grid, so 3 is the spec (§6.1). */
 .up{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.ucard{background:linear-gradient(160deg,var(--orange-dim),var(--bg2));border:1px solid var(--orange-line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;transition:.15s}
-.ucard .evicon{width:40px;height:40px;border-radius:11px;background:rgba(255,148,56,.2);display:grid;place-items:center;color:#ffb877;font-size:21px}
-.ucard .en{font-family:var(--disp);font-weight:900;font-size:21px;color:#fff}
-.ucard .datebox{display:flex;align-items:baseline;gap:8px}
-.ucard .d{font-family:var(--num);font-weight:700;font-size:26px;line-height:1;color:#ffb877}
-.ucard .mo{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.04em;text-transform:uppercase;color:#e9c9a5}
+/* Built on the same bones as .lcard above: icon down the left, vertically
+   centred against the whole text block, name and date stacked beside it. The
+   two rows of cards sit directly above one another on the homepage, so sharing
+   the pattern is what stops them reading as two unrelated designs.
+   These cards hold the least information on the page, so they must not be the
+   tallest thing on it — the icon, the name and the date all came down together,
+   and the padding with them, rather than shrinking any one part out of
+   proportion. */
+.ucard{background:linear-gradient(160deg,var(--orange-dim),var(--bg2));border:1px solid var(--orange-line);border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px;transition:.15s}
+/* the .clickable class is added by navigation.js, and ONLY to cards whose
+   event has something on its Detail page — most upcoming events do not */
+.ucard.clickable{cursor:pointer}
+.ucard.clickable:hover{transform:translateY(-2px);box-shadow:0 16px 40px -26px var(--orange-line)}
+.ucard .evicon{width:38px;height:38px;border-radius:11px;background:rgba(255,148,56,.2);display:grid;place-items:center;color:#ffb877;font-size:19px;flex:none}
+/* min-width:0 so a long name wraps inside the flex row instead of pushing the
+   icon out of the card */
+.ucard .uc-t{flex:1;min-width:0}
+/* It wraps rather than truncating: the name is the whole point of the card, and
+   an ellipsis would hide the one thing it exists to say. */
+.ucard .en{font-family:var(--disp);font-weight:900;font-size:17px;color:#fff;line-height:1.25}
+.ucard .datebox{display:flex;align-items:baseline;gap:7px;margin-top:5px}
+.ucard .d{font-family:var(--num);font-weight:700;font-size:21px;line-height:1;color:#ffb877}
+.ucard .mo{font-family:var(--disp);font-weight:800;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#e9c9a5}
 
 /* ---- shared bits used by the later views (tables, detail, calendar) ---- */
 .tablecard{background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden}
@@ -199,6 +349,8 @@ tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
 .st-done{background:var(--done-dim);color:#5fdc9d;border:1px solid var(--done-line)}
 .st-up{background:var(--orange-dim);color:#ffb877;border:1px solid var(--orange-line)}
 .st-live{background:var(--live-dim);color:#ff8a8f;border:1px solid var(--live-line);cursor:pointer}
+/* "Results Pending" — neutral blue, deliberately not a warning colour */
+.st-pending{background:var(--pending-dim);color:#8fc7ff;border:1px solid var(--pending-line)}
 .st-live .d{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.2s infinite}
 
 .totals-cap{font-family:var(--disp);font-weight:800;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:#fff;text-align:center;margin:34px 0 6px}
@@ -220,33 +372,110 @@ tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
 .section{margin-top:38px}
 .section > h2{font-size:18px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:9px}
 .section > h2 .ico{color:var(--gold);font-size:19px;display:flex}
-.writeup{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
-.writeup p{font-size:15px;color:#fff;margin-top:10px} .writeup p:first-child{margin-top:0}
+/* The write-up panel runs the FULL content width, exactly like the results
+   table and the house result boxes above it. It used to be capped at 900px,
+   which made it the only block on the page narrower than the rest and read as
+   an accident rather than a choice.
+   The text fills the panel — the box and its text are always the same width, so
+   there is never a stranded empty strip down one side. */
+.writeup{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:24px 28px}
+/* Base (also mobile): 16px. */
+.writeup p{font-size:16px;line-height:1.7;color:#fff;margin-top:16px}
+.writeup p:first-child{margin-top:0}
 .writeup .hl{color:var(--gold2);font-weight:600}
+/* THE CARD is full width; THE LINE OF TEXT inside it must not be. Left to fill
+   1040px, a 16px line runs to about 112 characters, and past roughly 90 the eye
+   starts losing its place tracking back to the start of the next line.
+   Side padding is the ONLY lever used for this — the type stays at the 16px/1.7
+   used for body text everywhere else on the site. It briefly went to 19px/1.8
+   here, which did shorten the measure but made the write-up conspicuously
+   larger than every other block of text on the page. Fixing the measure must
+   not cost the site its consistent body size.
+   Measured at 1280px (1040px panel), rendered characters per line:
+      28px gutters → 982px of text → 112 characters   (too long)
+      72px gutters → 894px         →  90              ← chosen
+     112px gutters → 814px         →  82
+     176px gutters → 686px         →  75  (best measure, heaviest gutters)
+   72px sits at the top of the comfortable range while keeping the text column
+   clearly the width of the card rather than a narrow strip stranded inside it.
+   The gutters scale with the viewport, reaching the 72px maximum at about
+   1200px and easing to 28px — the same as the mobile padding — as the window
+   narrows, so nothing jumps at the breakpoint.
+   Scoped to min-width so PHONE sizing is untouched: below 761px the panel is
+   already full width and 16px/1.7 already suits the narrow column. */
+@media(min-width:761px){
+  .writeup{padding:28px clamp(28px, 6vw, 72px)}
+}
 .cat-name{color:#fff;font-family:var(--disp);font-weight:800;font-size:15px}
 .rosters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
 .roster{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .roster h4{font-family:var(--disp);font-weight:900;font-size:15px;padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
 .roster ul{list-style:none;padding:8px 0}
 .roster li{padding:7px 16px;font-size:14px;font-weight:500}
+
+/* --- rosters grouped by age category --------------------------------------
+   A category sub-heading inside a house card. */
+.roster .rcat{font-family:var(--disp);font-weight:800;font-size:11px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);
+  padding:10px 16px 0}
+.roster .rcat + ul{padding-top:4px}
+.roster li.empty{color:var(--muted2);font-weight:600}
+
+/* Align the same category across every house card, so "Under 14" sits at the
+   same height in all of them however many players each house has.
+
+   This uses subgrid: the container defines one row for the house name plus two
+   rows per category (heading + list), and each card spans all of them and
+   inherits those rows. A tall group in one house therefore pushes the next
+   heading down in EVERY house.
+
+   --roster-rows is set by render.js, which knows how many categories there are.
+   Browsers without subgrid never get the .aligned rules and simply show the
+   same headings and names unaligned — grouped and readable, just not locked to
+   a shared baseline. */
+@supports (grid-template-rows: subgrid) {
+  .rosters.aligned{grid-template-rows:var(--roster-rows);align-items:start}
+  .rosters.aligned .roster{grid-row:1 / -1;display:grid;grid-template-rows:subgrid}
+}
 .gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.photo{aspect-ratio:4/3;border-radius:12px;background:linear-gradient(135deg,#1b2436,#141b29);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted2);font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.08em}
-/* real photos fill the same tile shape as the placeholder above */
-img.photo{width:100%;height:100%;object-fit:cover;display:block}
+/* Every photo is an <img>; the dark gradient shows through while it loads. */
+.photo{aspect-ratio:4/3;border-radius:12px;background:linear-gradient(135deg,#1b2436,#141b29);
+  border:1px solid var(--line);width:100%;height:100%;object-fit:cover;display:block}
+/* Optional note about an event's results. Informational, not a warning: a gold
+   accent rail and a soft gold wash, matching the site's accent rather than
+   borrowing a red/orange alert colour. */
+.result-note{display:flex;align-items:flex-start;gap:12px;margin-top:18px;
+  background:linear-gradient(90deg,rgba(247,184,27,.13),rgba(247,184,27,.05));
+  border:1px solid rgba(247,184,27,.22);border-left:3px solid var(--gold);
+  border-radius:12px;padding:14px 18px}
+.result-note .rn-ico{color:var(--gold2);font-size:18px;display:flex;flex:none;margin-top:1px}
+.result-note .rn-text{color:#f4dfae;font-size:14.5px;line-height:1.5;font-weight:500}
+
+/* "Final results are awaited" panel on Event Detail. Calm and factual, in the
+   same neutral blue as the Results Pending pill — not an error. */
+.pending-note{background:var(--pending-dim);border:1px solid var(--pending-line);
+  border-radius:14px;padding:18px 20px;color:#bcd9ff;
+  font-family:var(--disp);font-weight:800;font-size:15px}
+
 /* ---- Live Mini-Site link (Event Detail) ----
    Just the button, sitting directly below the results. */
 .minisite-section{margin-top:26px}
+/* max-width, and no nowrap: the label is long enough to overflow a 320px phone
+   on its own, so it is allowed to wrap rather than push the page sideways. */
 .minisite-btn{font-family:var(--disp);font-weight:800;font-size:14.5px;
   background:linear-gradient(135deg,var(--gold2),var(--gold-deep));color:#20160a;
   padding:11px 20px;border-radius:10px;display:inline-flex;align-items:center;gap:8px;
-  white-space:nowrap;box-shadow:0 0 22px var(--gold-glow);transition:.15s}
+  max-width:100%;box-shadow:0 0 22px var(--gold-glow);transition:.15s}
 .minisite-btn:hover{transform:translateY(-1px);filter:brightness(1.06)}
 
 .cal-link{font-family:var(--disp);font-weight:800;font-size:12.5px;color:var(--gold2);background:rgba(247,184,27,.14);border:1px solid rgba(247,184,27,.4);padding:4px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
 .cal-link:hover{background:rgba(247,184,27,.24)}
-/* the "View live" variant — status red, independent of any house colour.
-   Inert until V2 builds the live mini-sites, so it does not offer a pointer. */
-.cal-link.live{color:#ff8a8f;background:var(--live-dim);border-color:var(--live-line);cursor:default}
+/* the "Watch live" variant — status red, independent of any house colour.
+   It is a real link to that event's mini-site now, so it takes a pointer like
+   any other link. It is only ever drawn when there is somewhere to go. */
+.cal-link.live{color:#ff8a8f;background:var(--live-dim);border-color:var(--live-line);cursor:pointer}
+.cal-link.live:hover{background:rgba(255,81,88,.24)}
 /* a status the site doesn't recognise still renders as a calm neutral pill */
 .st-other{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 
@@ -268,12 +497,47 @@ img.photo{width:100%;height:100%;object-fit:cover;display:block}
   nav.main a.active{color:#1c1c1e;background:rgba(0,0,0,.12)}
   .menubtn{display:block}.meta{display:none}
   .hero{padding:38px 0 24px}
+  /* The title cannot shrink below its longest WORD, so on a narrow phone the
+     trophy and "Championship" together are wider than the screen and the whole
+     page scrolls sideways. (Measured at 320px: 343px needed against a 280px
+     content box.) Allowing the lockup to wrap drops the title under the trophy
+     instead. Deliberately mobile-only — on desktop there is room, and wrapping
+     there would break the approved side-by-side hero. */
+  .hero-lockup{flex-wrap:wrap}
   .sechead{margin:38px 0 14px}
-  .split,.up,.extra3,.latest,.boxes,.totals,.dtotals,.rosters{grid-template-columns:1fr}
+  /* Keep the banner compact so it doesn't push the leaderboard off the screen.
+     The event name drops to its own line beneath the tag and the link (these
+     two rules are the prototype's own mobile treatment). */
+  .livebanners{margin-top:12px}
+  .livebanner{flex-wrap:wrap;gap:8px;padding:10px 14px}
+  /* flex-basis, not width: the desktop rule sets flex:1 (basis 0), which would
+     override a plain width:100% and leave the name squeezed on the first row. */
+  .livebanner .lb-name{font-size:14px;flex:0 0 100%;order:3}
+  .livebanner .lb-link{margin-left:auto}
+  .split,.up,.extra3,.latest,.boxes,.totals,.dtotals,.rosters,.spotlights{grid-template-columns:1fr}
+  /* Keep the spotlight compact so the leaderboard stays reachable. */
+  .scard{padding:15px 16px;gap:13px}
+  .scard .cup{width:44px;height:44px;font-size:23px}
+  .scard .sc-name{font-size:18px;margin:2px 0 7px}
+  /* One column on mobile, so there is nothing to align across — switch the
+     shared rows off, or all three cards would be stacked into the same cell.
+     Each card goes back to being an ordinary block with grouped lists. */
+  .rosters.aligned{grid-template-rows:none}
+  .rosters.aligned .roster{grid-row:auto;display:block}
   .gallery{grid-template-columns:repeat(2,1fr)}
   .hbox{padding:20px 18px}
   .hbox .bpts{font-size:52px}
   .lcard .lc-name{font-size:16px}
+  /* The house name is the heading of its result box, but at 21px it read as
+     just more body text. Nudged up so the box has an obvious title — and no
+     further, because .dtbox's min-height is what sets the box height and all
+     three boxes must still be visible at once on a phone. At 24px the text
+     still sits well inside that min-height, so the boxes do not grow at all. */
+  .dtbox .ph{font-size:24px}
+  /* The event name is the page title and was the same size as the section
+     headings under it. Modest bump only: this is the top of a page people
+     scroll, and every extra pixel here costs depth further down. */
+  .detail-title{font-size:32px}
 
   /* tables → stacked cards, event name = gold header bar */
   .tablecard{background:transparent;border:none;overflow:visible}
@@ -285,6 +549,11 @@ img.photo{width:100%;height:100%;object-fit:cover;display:block}
   .tablecard tbody tr:last-child{margin-bottom:0}
   .tablecard td{border:none!important;padding:9px 16px;display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:14px}
   .tablecard td+td{border-top:1px solid var(--line2)!important}
+  /* On desktop a wide cell is fine — the .scroller scrolls sideways inside its
+     own box. Here the table has become stacked cards and .scroller is visible,
+     so nothing clips any more: a long unbroken value in a cell (grades, a house
+     name) would push the whole PAGE sideways. Let cell text wrap instead. */
+  .tablecard td{white-space:normal;overflow-wrap:anywhere;min-width:0}
   .tablecard td::before{content:attr(data-label);font-family:var(--disp);font-weight:800;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#fff;flex:none}
   .tablecard td:empty{display:none}
   .tablecard td.mobile-head{order:-1;background:linear-gradient(180deg,var(--gold2),var(--gold));padding:12px 16px;border:none!important;color:#3a2907}

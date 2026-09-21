@@ -182,27 +182,16 @@ function calculateRanks(entries) {
 }
 
 // =====================================================================
-// SECTION 3 — display helpers for ties
+// SECTION 3 — keeping tied houses in a predictable order
 // =====================================================================
 
 /**
- * Build the label for a placing: one badge, tied houses joined by " & ".
+ * Put house ids back into Houses-tab order.
  *
- * Order is always the order of the Houses tab, so the same tie never appears as
- * "Beta & Alpha" in one place and "Alpha & Beta" in another.
+ * This is what stops the same tie reading as "Beta & Alpha" in one place on the
+ * site and "Alpha & Beta" in another: every list of tied houses leaves this file
+ * in one fixed order, and the render files draw them in the order given.
  */
-function buildPlacingLabel(houseIds, houses) {
-  return houses
-    .filter(function (house) {
-      return houseIds.indexOf(house.id) !== -1;
-    })
-    .map(function (house) {
-      return house.name;
-    })
-    .join(" & ");
-}
-
-/** Put house ids back into Houses-tab order. */
 function sortHouseIdsBySheetOrder(houseIds, houses) {
   return houses
     .filter(function (house) {
@@ -297,11 +286,11 @@ function tier1SchemeFor(event, config) {
  *
  * Writes onto the event and returns nothing:
  *   event.tier1        [{ houseId, position, points }]   — the §5 contract
- *   event.tier1Display [{ position, points, houseIds, label, isTie }] — one
- *                      entry per BADGE, so a tie renders as a single token
+ *   event.tier1Display [{ position, points, houseIds }]  — one entry per BADGE,
+ *                      so a tie renders as a single token with two names
  *   event.tier2Tally   [{ houseId, points, rank }]       — Detail-page table
  */
-function calculateTier1(event, data, notes) {
+function calculateTier1(event, data) {
   const houses = data.houses;
   const config = data.config;
 
@@ -310,39 +299,20 @@ function calculateTier1(event, data, notes) {
   event.tier1Display = [];
   event.tier2Tally = [];
 
+  // No usable Tier-1 scheme (an unrecognised event type, or the type's scheme
+  // missing from Config). Award nothing and say nothing: validate.js has
+  // already reported the underlying fault, against the exact cell at fault.
   const schemeInfo = tier1SchemeFor(event, config);
-  if (!schemeInfo) {
-    notes.push({
-      level: "error",
-      tab: "Events",
-      subject: event.id,
-      cell: "tier1_override",
-      message:
-        'No Tier-1 point scheme available for this event (type "' +
-        event.type +
-        '" has no default scheme in Config, and no tier1_override was set). It scores no points.',
-    });
-    return;
-  }
+  if (!schemeInfo) return;
 
   let placeGroups = [];
 
   if (event.resultsMode === RESULTS_MODE.CALCULATED) {
     const tier2Scheme = config.schemes.tier2;
 
-    if (!tier2Scheme) {
-      notes.push({
-        level: "error",
-        tab: "Config",
-        subject: "tier2_scheme",
-        cell: "value",
-        message:
-          'Event "' +
-          event.id +
-          '" is Calculated but tier2_scheme is missing, so its individual results cannot be scored.',
-      });
-      return;
-    }
+    // Same again: a missing tier2_scheme is reported once by validate.js,
+    // against the Config tab, rather than once per affected event.
+    if (!tier2Scheme) return;
 
     const tier2 = calculateTier2(event, tier2Scheme, houses);
 
@@ -386,7 +356,14 @@ function calculateTier1(event, data, notes) {
       groupByEqualPoints(scoringHouses),
       schemeInfo.scheme
     );
-  } else if (event.resultsMode === RESULTS_MODE.DIRECT) {
+  } else if (
+    event.resultsMode === RESULTS_MODE.DIRECT ||
+    event.resultsMode === RESULTS_MODE.OVERRIDE
+  ) {
+    // Direct and Override score IDENTICALLY: the house order is whatever was
+    // typed into direct_1st/2nd/3rd. Any Results rows the event may also have
+    // are display-only and contribute nothing here — which is precisely what
+    // makes Override an override.
     const placings = event.directPlacings || [];
     if (placings.length === 0) {
       return; // nothing entered yet — award nothing
@@ -420,16 +397,9 @@ function calculateTier1(event, data, notes) {
       return group.position;
     });
   } else {
-    notes.push({
-      level: "error",
-      tab: "Events",
-      subject: event.id,
-      cell: "results_mode",
-      message:
-        'Results mode "' +
-        event.resultsMode +
-        '" is not recognised, so this event scores no points.',
-    });
+    // An unrecognised (or missing) results_mode. Award nothing, silently:
+    // validate.js reports this against the results_mode cell, with the right
+    // wording for whether the event is Completed yet.
     return;
   }
 
@@ -446,13 +416,14 @@ function calculateTier1(event, data, notes) {
       });
     });
 
-    // One row per BADGE — the render-facing shape. A tie is a single badge.
+    // One row per BADGE — the render-facing shape. A tie is a single badge
+    // holding two house ids, which the render files draw as "Beta & Alpha",
+    // each name in its own house colour. Only the ids are passed: turning them
+    // into names and colours is the render files' job, not this file's.
     event.tier1Display.push({
       position: group.position,
       points: group.points,
       houseIds: orderedIds,
-      label: buildPlacingLabel(orderedIds, houses),
-      isTie: orderedIds.length > 1,
     });
   });
 }
@@ -567,45 +538,27 @@ function finaliseTable(totals) {
     return {
       houseId: entry.houseId,
       points: roundToTwoDecimals(entry.points), // display value
-      pointsExact: entry.points, // full precision, for any further maths
+      // Full precision, kept for any further maths. Nothing reads it today —
+      // it is here so that a later total built ON a season total (a year-on-year
+      // table, say) can start from the true value rather than the rounded one.
+      pointsExact: entry.points,
       rank: entry.rank,
     };
   });
 }
 
-/**
- * Who is Best House? Everyone sharing top rank — joint champions, with no
- * artificial tiebreaker, matching the per-event tie philosophy.
- *
- * Returns null when nothing has been scored yet, so the page can simply omit
- * the title rather than crowning everybody with zero points.
- */
-function findChampion(overallTable, houses) {
-  if (overallTable.length === 0) return null;
-
-  const leaders = overallTable.filter(function (entry) {
-    return entry.rank === 1;
-  });
-
-  const everyoneOnZero = overallTable.every(function (entry) {
-    return pointsEqual(entry.pointsExact, 0);
-  });
-  if (everyoneOnZero) return null;
-
-  const houseIds = sortHouseIdsBySheetOrder(
-    leaders.map(function (entry) {
-      return entry.houseId;
-    }),
-    houses
-  );
-
-  return {
-    houseIds: houseIds,
-    label: buildPlacingLabel(houseIds, houses),
-    points: leaders[0].points,
-    isJoint: houseIds.length > 1,
-  };
-}
+// NO "BEST HOUSE" / CHAMPION IS CALCULATED HERE, deliberately.
+//
+// The site shows the overall table, and the house at rank 1 is plainly the
+// leader — no separate champion value is needed to draw it. A named champion
+// would only be needed to declare a SEASON WINNER, and blueprint §22 records
+// that the season-overall tiebreaker was never confirmed (joint Best House, or
+// some tiebreaker?). Deciding that in code would be inventing a rule nobody
+// agreed, so this file does not.
+//
+// If a champion is ever wanted: settle the tiebreaker first, then read it off
+// standings.overall — every house at rank 1 is a joint leader, because
+// calculateRanks already applies the confirmed tie rule.
 
 /**
  * Build the whole standings object (blueprint §5).
@@ -638,18 +591,11 @@ function calculateStandings(data, seasonYear) {
     houses
   );
 
-  const overall = finaliseTable(overallTotals);
-
   return {
-    overall: overall,
+    overall: finaliseTable(overallTotals),
     sports: finaliseTable(sportsTotals),
     cocurricular: finaliseTable(cocurricularTotals),
     extra: finaliseTable(extraTotals),
-
-    // Extras beyond the §5 minimum, for the header and hero:
-    champion: findChampion(overall, houses),
-    seasonYear: seasonYear || "",
-    completedEventCount: completedEvents.length,
   };
 }
 
@@ -667,40 +613,36 @@ function calculateStandings(data, seasonYear) {
  *     const checked = validateSiteData(loaded);
  *     const scored  = calculateAll(checked.data);
  *
- * Returns { data, warnings }. The warnings use the same shape validate.js
- * produces, so main.js can simply join the two lists for the ?debug panel.
+ * Returns { data, warnings }. The warnings list is kept in the signature so
+ * main.js can join it with validate.js's, but it is now ALWAYS EMPTY — and
+ * deliberately so.
+ *
+ * WHY THIS FILE NO LONGER REPORTS PROBLEMS
+ * Every fault that stops an event scoring — an unreadable results_mode, a
+ * missing point scheme, an unrecognised event type — is a DATA fault, and
+ * validate.js already reports each one against the exact cell at fault. When
+ * this file reported them too, a single mistake appeared twice in the ?debug
+ * panel in two different wordings, and the counts overstated how much was
+ * actually wrong. Checking data is validate.js's job; this file just does the
+ * arithmetic, and stays quiet when it cannot.
  */
 function calculateAll(data) {
-  const notes = [];
-
   // Guard: with no data or no houses there is nothing to add up. Return an
   // empty-but-valid standings object so the rest of the site cannot crash.
   if (!data || !data.houses || data.houses.length === 0) {
     if (data) {
-      data.standings = {
-        overall: [],
-        sports: [],
-        cocurricular: [],
-        extra: [],
-        champion: null,
-        seasonYear: "",
-        completedEventCount: 0,
-      };
+      data.standings = { overall: [], sports: [], cocurricular: [], extra: [] };
     }
-    return { data: data, warnings: notes };
+    return { data: data, warnings: [] };
   }
 
   // Step 1 — every event's own points, independent of every other event.
   (data.events || []).forEach(function (event) {
-    calculateTier1(event, data, notes);
+    calculateTier1(event, data);
   });
 
   // Step 2 — add the completed events up into the season standings.
   data.standings = calculateStandings(data, data.config && data.config.currentYear);
 
-  notes.forEach(function (note) {
-    console.error("calculate.js: [" + note.tab + " — " + note.subject + "] " + note.message);
-  });
-
-  return { data: data, warnings: notes };
+  return { data: data, warnings: [] };
 }

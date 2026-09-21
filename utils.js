@@ -1,10 +1,29 @@
 // utils.js
-// Small shared helpers used by more than one module — date handling, colour
-// handling, and safe text output. Nothing in here knows anything about this
-// school, the Google Sheet, or the page layout.
+// Small shared helpers — date handling, number handling, colour handling, and
+// safe text output. Nothing in here knows anything about this school, the
+// Google Sheet, or the page layout.
 //
-// Keep this file small. If a helper is only ever used by one module, it belongs
-// in that module, not here.
+// Keep this file small. As a rule, a helper used by only one module belongs in
+// that module. The number parsers below are the deliberate exception: the
+// project's architecture (CLAUDE.md) names "safe number parsing" as this file's
+// job, so they live here even though only data.js calls them today.
+
+// =====================================================================
+// The address bar
+// =====================================================================
+
+/**
+ * Is "?debug" in the address?
+ *
+ * Lives here rather than in render-debug.js because three different modules now
+ * need the answer and they must all agree: render-debug.js decides whether to
+ * draw the panel, main.js decides whether to ask for the extra diagnostics, and
+ * the extra diagnostics cost a second request per tab — so a disagreement would
+ * mean ordinary visitors quietly paying for a panel they never see.
+ */
+function isDebugRequested() {
+  return new URLSearchParams(window.location.search).has("debug");
+}
 
 // =====================================================================
 // Text
@@ -35,30 +54,77 @@ const MONTH_NAMES = ["January","February","March","April","May","June",
                      "July","August","September","October","November","December"];
 
 /**
+ * Build a Date from year/month/day numbers, or null if that date doesn't exist.
+ * The round-trip check is what rejects 31 February and 40/13/2026.
+ */
+function makeRealDate(year, month, day) {
+  const date = new Date(year, month - 1, day);
+  const isReal =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+  return isReal ? date : null;
+}
+
+/**
  * Turn a Sheet date cell into a Date, or null if it isn't a usable date.
  *
- * The Sheet's date cells arrive as "2026-07-05". We accept that, plus anything
- * else the browser can parse, but reject text that isn't a date at all (or an
- * impossible one like 2026-13-40).
+ * WHY THIS IS FUSSIER THAN IT LOOKS
+ * Google's CSV export gives us the date as it is DISPLAYED in the Sheet, not in
+ * any fixed format. Change the spreadsheet's locale or the column's format and
+ * the text we receive changes with it: "2026-07-05" becomes "05/07/26".
+ *
+ * That matters because JavaScript's own Date.parse reads a slash date the
+ * AMERICAN way, month first. Left to itself it would read "05/07/26" as 7 May
+ * instead of 5 July, and would fail outright on "24/07/26" because there is no
+ * month 24. So we never hand a slash date to Date.parse.
+ *
+ * Formats handled, in order:
+ *   1. 2026-07-05          ISO, unambiguous — always tried first
+ *   2. 5/7/2026, 05/07/26  DAY first (also - or . separators), matching the
+ *                          Indian convention the Sheet is set to
+ *   3. anything else       handed to the browser ("5 July 2026", "Jul 5 2026")
+ *
+ * ASSUMPTION WORTH KNOWING: rule 2 is day-first. A Sheet switched to American
+ * month-first formatting would be misread for days of 12 or less. If that ever
+ * happens, the fix belongs here, in this one function.
  */
 function parseSheetDate(text) {
   const value = String(text || "").trim();
   if (value === "") return null;
 
-  const isoParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  // --- 1. ISO, e.g. "2026-07-05" ---
+  const isoParts = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
   if (isoParts) {
-    const year = Number(isoParts[1]);
-    const month = Number(isoParts[2]);
-    const day = Number(isoParts[3]);
-    const date = new Date(year, month - 1, day);
-    // If the parts survive the round trip, the date really exists.
-    const isReal =
-      date.getFullYear() === year &&
-      date.getMonth() === month - 1 &&
-      date.getDate() === day;
-    return isReal ? date : null;
+    return makeRealDate(Number(isoParts[1]), Number(isoParts[2]), Number(isoParts[3]));
   }
 
+  // --- 2. Day-first, e.g. "05/07/26", "5/7/2026", "05-07-2026", "05.07.2026" ---
+  const dayFirst = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(value);
+  if (dayFirst) {
+    const day = Number(dayFirst[1]);
+    const month = Number(dayFirst[2]);
+    let year = Number(dayFirst[3]);
+
+    // A two-digit year: 00-69 means this century, 70-99 the last one. Every
+    // date this site deals with is well inside 2000-2069.
+    if (dayFirst[3].length === 2) {
+      year = year <= 69 ? 2000 + year : 1900 + year;
+    }
+
+    return makeRealDate(year, month, day);
+  }
+
+  // --- 3. Reject a bare run of digits BEFORE handing anything to the browser ---
+  //
+  // A date cell formatted as a plain number exports as a spreadsheet serial
+  // number: 5 July 2026 becomes "46203". Date.parse reads that as the YEAR
+  // 46203 and cheerfully returns a real date, so the site would show a
+  // nonsense far-future date with nothing to say it was wrong. A bare number
+  // is never a date this site can honestly read, so it fails here instead.
+  if (/^\d+$/.test(value)) return null;
+
+  // --- 4. Anything else the browser understands, e.g. "5 July 2026" ---
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? new Date(timestamp) : null;
 }
@@ -127,6 +193,161 @@ function formatTimestamp(isoText) {
 // =====================================================================
 // Numbers
 // =====================================================================
+
+// A point scheme lists what 1st, 2nd, 3rd… are worth. Fewer than two places
+// isn't a scheme (write "10,0,0" if only the winner scores), and no school has
+// more than ten placings worth naming.
+const SCHEME_MIN_PLACES = 2;
+const SCHEME_MAX_PLACES = 10;
+
+/**
+ * Read a point scheme AND say what is wrong with it: "10,7,4" → [10, 7, 4].
+ *
+ * WHY THIS IS SO FUSSY. A scheme is the most dangerous cell in the whole Sheet:
+ * it multiplies into every event, and a mistake in it produces a complete,
+ * plausible-looking leaderboard that happens to be wrong. Rejecting only
+ * non-numeric text is not enough, because the dangerous typos still look
+ * numeric once split on the commas:
+ *
+ *   ",10,7,4"        one stray comma  → [0,10,7,4]  1st worth NOTHING, 2nd worth 10
+ *   "10,,4"          double comma     → [10,0,4]    silver silently worth nothing
+ *   "1,000,500,100"  thousands commas → [1,0,500,100] 1st worth 1, 2nd worth 0
+ *   "0,0,0"                           → nothing ever scores, in silence
+ *
+ * So every rule below exists to catch a specific way of being silently wrong:
+ *
+ *   1. no empty pieces      — catches a stray, doubled or trailing comma
+ *   2. every piece a number — catches "ten,seven,four", "10;7;4", "₹10,7,4"
+ *   3. 2 to 10 places       — catches "10" on its own, where 2nd and 3rd would
+ *                             quietly score zero
+ *   4. never goes UP        — catches thousands separators, because a real
+ *                             scheme is worth less for each lower place
+ *   5. something above zero — catches "0,0,0" and all-negative schemes
+ *
+ * Decimals are fine throughout (fractional point schemes are supported), and
+ * equal values are allowed ("5,5,3"), because only an INCREASE is nonsense.
+ *
+ * Returns { scheme, problem, blank }:
+ *   scheme  — the numbers, or null if unusable
+ *   problem — a plain-English reason, or null if it is fine (or blank)
+ *   blank   — true when the cell is simply empty, which some callers allow
+ */
+function readScheme(text) {
+  const value = String(text == null ? "" : text).trim();
+
+  if (value === "") return { scheme: null, problem: null, blank: true };
+
+  const pieces = value.split(",");
+
+  // --- 1. no empty pieces ---
+  const emptyAt = pieces.findIndex(function (piece) {
+    return piece.trim() === "";
+  });
+  if (emptyAt !== -1) {
+    return {
+      scheme: null,
+      blank: false,
+      problem:
+        'there is a missing value between the commas (piece ' + (emptyAt + 1) +
+        ' of ' + pieces.length + ' is empty). A stray, doubled or trailing ' +
+        'comma does this. Write it as numbers separated by single commas, ' +
+        'e.g. "10,7,4"',
+    };
+  }
+
+  // --- 2. every piece a number ---
+  const numbers = pieces.map(function (piece) {
+    return Number(piece.trim());
+  });
+  const badAt = numbers.findIndex(function (n) {
+    return !Number.isFinite(n);
+  });
+  if (badAt !== -1) {
+    return {
+      scheme: null,
+      blank: false,
+      problem:
+        '"' + pieces[badAt].trim() + '" is not a number. A scheme must be ' +
+        'plain numbers separated by commas, e.g. "10,7,4" — no words, no ' +
+        'currency symbols, and commas (not semicolons) between the places',
+    };
+  }
+
+  // --- 3. a believable number of places ---
+  if (numbers.length < SCHEME_MIN_PLACES || numbers.length > SCHEME_MAX_PLACES) {
+    return {
+      scheme: null,
+      blank: false,
+      problem:
+        'it lists ' + numbers.length + ' place' + (numbers.length === 1 ? '' : 's') +
+        ', which does not look right. A scheme needs between ' +
+        SCHEME_MIN_PLACES + ' and ' + SCHEME_MAX_PLACES + ' values — one per ' +
+        'place. If only the winner should score, write it out in full, ' +
+        'e.g. "10,0,0"',
+    };
+  }
+
+  // --- 4. never worth MORE for a lower place ---
+  for (let i = 1; i < numbers.length; i++) {
+    if (numbers[i] > numbers[i - 1]) {
+      return {
+        scheme: null,
+        blank: false,
+        problem:
+          'place ' + (i + 1) + ' is worth more (' + numbers[i] + ') than place ' +
+          i + ' (' + numbers[i - 1] + '), which cannot be right. The usual ' +
+          'cause is writing thousands with commas — "1,000,500,100" is read as ' +
+          'four separate places worth 1, 0, 500 and 100. Write plain numbers ' +
+          'with no thousands separators',
+      };
+    }
+  }
+
+  // --- 5. something has to be worth having ---
+  const anyPositive = numbers.some(function (n) {
+    return n > 0;
+  });
+  if (!anyPositive) {
+    return {
+      scheme: null,
+      blank: false,
+      problem:
+        'every place is worth zero or less, so nothing using this scheme could ' +
+        'ever score. At least the first place must be worth more than zero',
+    };
+  }
+
+  return { scheme: numbers, problem: null, blank: false };
+}
+
+/**
+ * Just the numbers, or null if the scheme is blank or unusable.
+ * data.js uses this; validate.js uses describeSchemeProblem() to say why.
+ */
+function parseScheme(text) {
+  return readScheme(text).scheme;
+}
+
+/**
+ * Why is this scheme unusable? Returns null if it is fine, or if it is simply
+ * blank — whether a blank scheme is allowed depends on which cell it came from,
+ * so that is the caller's decision, not this function's.
+ */
+function describeSchemeProblem(text) {
+  return readScheme(text).problem;
+}
+
+/**
+ * Read a single number from a Sheet cell.
+ *
+ * Returns null (never NaN) for anything unusable, because NaN spreads silently
+ * through arithmetic while null shows up immediately as a missing value.
+ */
+function parseNumber(text) {
+  if (text === "" || text == null) return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
 
 /**
  * Format a points value for display.

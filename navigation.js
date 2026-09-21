@@ -4,9 +4,10 @@
 // button, and tells Google Analytics each time the view changes.
 //
 // What it does NOT do: it never calculates anything and never fetches anything.
-// When a view needs drawing it calls the matching function in render.js and
+// When a view needs drawing it calls the matching render function (render-home,
+// render-events or render-detail) and
 // hands it the data object main.js already prepared. Navigation moves between
-// views; render.js draws them.
+// views; the render files draw them.
 //
 // Public entry point: initNavigation(data)
 
@@ -51,7 +52,7 @@ let currentEventId = null;
  * This is deliberately a single remembered view rather than a full history
  * stack: the only place Back appears is Event Detail, and the only question it
  * has to answer is "which list did I come from?" — Completed Events, the
- * homepage's Latest Results, or the Calendar.
+ * homepage's Recent Results, or the Calendar.
  */
 let viewBeforeDetail = VIEWS.HOME;
 
@@ -98,6 +99,19 @@ function showView(viewId, eventId) {
 
   trackViewChange(viewId, eventId);
   return true;
+}
+
+/**
+ * Redraw the Event Detail page if it happens to be the one on screen.
+ *
+ * Used when something arrives after the page was drawn — the Drive photos are
+ * the only case today. Does nothing at all if the visitor is somewhere else,
+ * which is the usual outcome, since photos normally land long before anyone
+ * opens an event.
+ */
+function refreshCurrentDetailView() {
+  if (currentView !== VIEWS.DETAIL || !currentEventId) return;
+  renderEventDetail(navigationData, currentEventId);
 }
 
 /** Put the gold underline under the nav link matching the current view. */
@@ -306,25 +320,22 @@ function wireMobileMenu() {
  * this again afterwards.)
  */
 function markInteractiveElements() {
-  // Every Completed Events row opens its event.
-  const eventRows = document.querySelectorAll("#events-rows tr[data-event-id]");
-  Array.prototype.forEach.call(eventRows, function (row) {
-    row.classList.add("clickable");
-  });
-
-  // Only the calendar rows that have results to show. An Upcoming row has
-  // nothing to open yet, and a Live row waits for V2.
-  const calendarRows = document.querySelectorAll("#calendar-rows tr[data-event-id]");
-  Array.prototype.forEach.call(calendarRows, function (row) {
-    if (row.querySelector(".cal-link:not(.live)")) {
-      row.classList.add("clickable");
-    }
-  });
-
-  // Homepage Latest Results cards.
-  const cards = document.querySelectorAll("#latest .lcard[data-event-id]");
-  Array.prototype.forEach.call(cards, function (card) {
-    card.classList.add("clickable");
+  // A row or card carries data-event-id (this site's Detail view) or
+  // data-event-url (an external mini-site) ONLY when there is somewhere worth
+  // going — render-shared.js's eventTargetAttr() decides that once for all of
+  // them. So the presence of either attribute is the whole test here, and a row
+  // with nothing on its page never gets marked.
+  const targets = document.querySelectorAll(
+    "#events-rows tr[data-event-id], #events-rows tr[data-event-url]," +
+    "#calendar-rows tr[data-event-id], #calendar-rows tr[data-event-url]," +
+    // Homepage: Recent Results, the promoted spotlight cards above them, and
+    // the Upcoming cards — which for a long time responded to clicks without
+    // ever looking clickable, including when their page was empty.
+    "#latest .lcard[data-event-id], #spotlight .scard[data-event-id]," +
+    "#upcoming .ucard[data-event-id], #upcoming .ucard[data-event-url]"
+  );
+  Array.prototype.forEach.call(targets, function (target) {
+    target.classList.add("clickable");
   });
 }
 
@@ -339,8 +350,13 @@ function wireContentClicks() {
   document.querySelector("main").addEventListener("click", function (clickEvent) {
     const target = clickEvent.target;
 
-    // "View live" is deliberately dead until V2 builds the live mini-sites.
-    if (target.closest(".cal-link.live")) return;
+    // Real links (a "Watch live" pill opening a mini-site in a new tab) are
+    // left entirely alone for the browser to handle.
+    //
+    // This return is also what stops a DOUBLE navigation: the row around that
+    // pill now carries data-event-url, so without stopping here both the link
+    // and the row handler below would fire and two tabs would open.
+    if (target.closest("a[href]")) return;
 
     // A "more" link in a section heading: "All events →", "View full calendar →".
     const moreLink = target.closest("[data-goto]");
@@ -349,16 +365,22 @@ function wireContentClicks() {
       return;
     }
 
-    // Anything carrying an event id — a table row, a "View details" pill, a
-    // "View results" pill, or a Latest Results card — opens that event.
+    // A Live event's row, which leads to an external mini-site. Clicking the
+    // pill inside it was handled by the browser and returned above; this is for
+    // clicks anywhere ELSE along the row, so the whole row behaves like every
+    // other row in the table.
+    const external = target.closest("[data-event-url]");
+    if (external) {
+      window.open(external.dataset.eventUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Anything carrying an event id — a table row, a "View details" or
+    // "View results" pill, a Recent Results card, an Upcoming card, a live
+    // banner — opens that event. Nothing carries an id unless its Detail page
+    // has something on it, so there is no dead-click case to guard against.
     const eventOwner = target.closest("[data-event-id]");
     if (eventOwner) {
-      // Upcoming calendar rows carry an id but have nothing to show yet.
-      const isCalendarRowWithoutResults =
-        eventOwner.matches("#calendar-rows tr") &&
-        !eventOwner.querySelector(".cal-link:not(.live)");
-      if (isCalendarRowWithoutResults) return;
-
       showView(VIEWS.DETAIL, eventOwner.dataset.eventId);
     }
   });

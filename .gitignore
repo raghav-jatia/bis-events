@@ -16,6 +16,11 @@ CLAUDE.md
 BIS-Interhouse-Blueprint-V1.md
 PROJECT-STATE.md
 
+# --- the photo-lister Apps Script ---
+# Built but NOT deployed (see CLAUDE.md → "Photos feature"). Kept out of the
+# public repo until the security question about it is settled.
+photos-apps-script.gs
+
 # --- the design prototype ---
 # Contains hardcoded SAMPLE standings. If published it would be live at
 # /bis-interhouse-FINAL.html and could easily be mistaken for real results.

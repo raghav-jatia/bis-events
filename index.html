@@ -8,8 +8,9 @@
 <title>Interhouse Events</title>
 
 <!-- Google Analytics 4. One snippet in the <head> covers the whole site.
-     navigation.js will later fire a virtual page-view on each view switch so
-     Home / Completed Events / Event Detail / Calendar are tracked separately. -->
+     navigation.js fires a virtual page-view on each view switch, so Home /
+     Completed Events / Event Detail / Calendar are tracked separately even
+     though the browser only ever loads this one file. -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-BE0HXKM398"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -24,7 +25,7 @@
 <!-- The ?v= number is a cache-buster. Browsers hold on to CSS and JS for a long
      time, so BUMP THIS NUMBER whenever you change styles.css or any .js file —
      otherwise visitors (and you) can keep running the previous version. -->
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=35">
 </head>
 <body>
 
@@ -40,10 +41,12 @@
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 21V4M4 4h13l-2 4 2 4H4"/></symbol>
   <symbol id="i-gift" viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="12" rx="1"/><path d="M2 9h20M12 9v12M12 9S9.5 4 7.5 4 5 7 7 9M12 9s2.5-5 4.5-5S19 7 17 9"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 7.6v.4"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5 4.8 13.6H11l-1 7.9 8.4-11.1H12l1-7.9Z"/></symbol>
 </svg>
 
 <!-- ===================== HEADER =====================
-     Every word here is filled in by render.js from the Config tab. -->
+     Every word here is filled in by render-shared.js from the Config tab. -->
 <header class="site">
   <div class="wrap bar">
     <a class="brand" href="#">
@@ -51,8 +54,8 @@
       <span><b id="brand-title"></b><span class="sub" id="brand-sub"></span></span>
     </a>
 
-    <!-- The nav links and this Menu button are wired up in navigation.js
-         (still to be built), so they do nothing yet. -->
+    <!-- The nav links and this Menu button are wired up by navigation.js; the
+         data-nav value is what tells it which view each link opens. -->
     <button class="menubtn" id="menubtn">Menu</button>
     <nav class="main" id="nav">
       <a data-nav="home" class="active" href="#">Home</a>
@@ -68,6 +71,12 @@
 
 <main class="wrap">
 
+  <!-- The ?debug diagnostics panel (blueprint §17). Stays hidden and empty
+       unless "?debug" is in the address, so ordinary visitors never see it.
+       It sits outside the four views so it shows whichever one is open — and
+       still shows if the data failed badly enough to hide the site. -->
+  <section class="debugpanel" id="debug-panel" hidden></section>
+
   <!-- Shown while the Sheet is being fetched. -->
   <div class="notice" id="loading">
     <div class="big">Loading…</div>
@@ -81,7 +90,7 @@
   </div>
 
   <!-- ===================== HOME =====================
-       Structure only. Every list below is filled in by render.js, and any
+       Structure only. Every list below is filled in by render-home.js, and any
        section with nothing to show is hidden rather than left empty. -->
   <section class="page" id="home">
 
@@ -91,6 +100,24 @@
         <h1><span class="grad" id="hero-title"></span><span class="yr" id="hero-year"></span></h1>
       </div>
       <div class="rule"></div>
+    </div>
+
+    <!-- Live banners (blueprint §14). Placed AFTER the hero so a visitor sees
+         what the site is before meeting an alert. Filled in by render-home.js and
+         hidden entirely unless an event is Live. -->
+    <div class="livebanners" id="live-banners" hidden></div>
+
+    <!-- Promoted recent results. Reading order on this page is:
+         hero → live banner → spotlight → leaderboard. The "All events" link
+         only appears here when the Recent Results section below is empty. -->
+    <div id="sec-spotlight" hidden>
+      <div class="sechead">
+        <span class="ico"><svg class="ic"><use href="#i-bolt"/></svg></span>
+        <h2>Just In</h2>
+        <span class="grow"></span>
+        <span class="more" data-goto="events" id="spotlight-more" hidden>All events <svg class="ic"><use href="#i-arrow"/></svg></span>
+      </div>
+      <div class="spotlights" id="spotlight"></div>
     </div>
 
     <div id="sec-leaderboard" hidden>
@@ -125,7 +152,7 @@
     <div id="sec-latest" hidden>
       <div class="sechead">
         <span class="ico"><svg class="ic"><use href="#i-trophy"/></svg></span>
-        <h2>Latest Results</h2>
+        <h2>Recent Results</h2>
         <span class="grow"></span>
         <span class="more" data-goto="events">All events <svg class="ic"><use href="#i-arrow"/></svg></span>
       </div>
@@ -146,7 +173,7 @@
   </section>
 
   <!-- ===================== COMPLETED EVENTS =====================
-       Same story as Home: structure only, filled in by render.js. -->
+       Same story as Home: structure only, filled in by render-events.js. -->
   <section class="page" id="events">
 
     <!-- Reached from the nav, so this always returns Home. -->
@@ -200,7 +227,22 @@
     <h1 class="detail-title" id="detail-title"></h1>
     <p class="dmeta" id="detail-meta"></p>
 
+    <!-- Shown instead of the result boxes / category table when the event has
+         happened but its results have not been entered yet. -->
+    <div class="pending-note" id="detail-pending" hidden>
+      Final results are awaited for this event.
+    </div>
+
     <div class="dtotals" id="detail-totals" hidden></div>
+
+    <!-- Optional free-text note about the results. Always sits here — after the
+         house result boxes, before the results table (or before whatever
+         section comes next when there is no table) — so it appears in the same
+         place on every kind of event. -->
+    <div class="result-note" id="detail-note" hidden>
+      <span class="rn-ico"><svg class="ic"><use href="#i-info"/></svg></span>
+      <span class="rn-text" id="detail-note-text"></span>
+    </div>
 
     <!-- Sport / Calculated variant -->
     <div class="section" id="detail-categories" hidden>
@@ -280,24 +322,35 @@
 
 <!-- ===================== MODULES =====================
      Load order matters: each file may use the ones above it.
-       config    — constants (Sheet id, allowed values)
-       utils     — small shared helpers (dates, colours, escaping)
-       data      — fetches the Sheet, builds the canonical data object
-       validate  — checks and cleans it
-       calculate — works out every number
-       render    — draws it
-       navigation— view switching, menu, Back button, analytics events
-       main      — runs the pipeline, then hands over to navigation
+       config      — constants (Sheet id, allowed values)
+       utils       — small shared helpers (dates, numbers, colours, escaping)
+       data        — fetches the Sheet, builds the canonical data object
+       validate    — checks and cleans it
+       calculate   — works out every number
+       render-shared— helpers used by more than one view, plus header + footer
+       render-home  — the Home view
+       render-events— the two event lists: Completed Events, and the Calendar
+       render-detail— one event's own page
+       render-debug — the ?debug panel; a maintainer's tool, not part of the site
+       navigation   — view switching, menu, Back button, analytics events
+       main         — runs the pipeline, then hands over to navigation
+
+     The four render-* view files never call each other. Anything two of them
+     both need lives in render-shared.js, which is why that one loads first.
 -->
 <!-- Keep the ?v= number here the same as the one on styles.css above. -->
-<script src="config.js?v=7"></script>
-<script src="utils.js?v=7"></script>
-<script src="data.js?v=7"></script>
-<script src="validate.js?v=7"></script>
-<script src="calculate.js?v=7"></script>
-<script src="render.js?v=7"></script>
-<script src="navigation.js?v=7"></script>
-<script src="main.js?v=7"></script>
+<script src="config.js?v=35"></script>
+<script src="utils.js?v=35"></script>
+<script src="data.js?v=35"></script>
+<script src="validate.js?v=35"></script>
+<script src="calculate.js?v=35"></script>
+<script src="render-shared.js?v=35"></script>
+<script src="render-home.js?v=35"></script>
+<script src="render-events.js?v=35"></script>
+<script src="render-detail.js?v=35"></script>
+<script src="render-debug.js?v=35"></script>
+<script src="navigation.js?v=35"></script>
+<script src="main.js?v=35"></script>
 
 </body>
 </html>
