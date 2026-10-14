@@ -493,9 +493,22 @@ function buildTier2ByEvent(resultRows, houseLookup) {
     const eventId = row.event_id || "";
     const places = [];
 
+    // The two cells exactly as typed, kept per rank so validate.js can compare
+    // how many names were written against how many houses. That comparison
+    // cannot be made from `places` below: by then the names have already been
+    // paired off positionally and any surplus has been dropped. Recorded, not
+    // judged — deciding whether a mismatch is worth reporting is validate's job.
+    const placeCells = {};
+
     PLACES.forEach(function (place) {
       const houses = resolveHouses(row[place.houseColumn], houseLookup);
       if (houses.length === 0) return; // place not awarded — nothing to record
+
+      placeCells[place.rank] = {
+        houses: row[place.houseColumn] || "",
+        names: row[place.nameColumn] || "",
+        nameColumn: place.nameColumn,
+      };
 
       // A tie may also carry two participant names, comma-separated.
       const names = (row[place.nameColumn] || "")
@@ -517,7 +530,11 @@ function buildTier2ByEvent(resultRows, houseLookup) {
     });
 
     if (!byEvent[eventId]) byEvent[eventId] = [];
-    byEvent[eventId].push({ category: row.category || "", places: places });
+    byEvent[eventId].push({
+      category: row.category || "",
+      places: places,
+      placeCells: placeCells,
+    });
   });
 
   return byEvent;

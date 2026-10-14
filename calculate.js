@@ -193,13 +193,28 @@ function calculateRanks(entries) {
  * in one fixed order, and the render files draw them in the order given.
  */
 function sortHouseIdsBySheetOrder(houseIds, houses) {
-  return houses
-    .filter(function (house) {
-      return houseIds.indexOf(house.id) !== -1;
-    })
-    .map(function (house) {
-      return house.id;
-    });
+  // ORDERS, NEVER DE-DUPLICATES. A house may legitimately hold the same place
+  // twice — "Beta, Beta" in direct_3rd is two separate awards — so every id
+  // handed in must come back out.
+  //
+  // This used to walk the HOUSES list and keep those present in houseIds, which
+  // is a membership test, not a sort: ["B","B"] came back as ["B"] and the
+  // second award silently vanished. The de-duplication was a side effect of how
+  // the ordering was written, never a scoring rule, and it cost a house a point
+  // without reporting anything.
+  const sheetPosition = {};
+  houses.forEach(function (house, index) {
+    sheetPosition[house.id] = index;
+  });
+
+  // An id with no matching house sorts last rather than throwing. Nothing
+  // should reach here unvalidated, but a NaN in a comparator would scramble the
+  // whole order rather than misplace one entry.
+  return houseIds.slice().sort(function (a, b) {
+    const left = sheetPosition[a] === undefined ? Number.MAX_SAFE_INTEGER : sheetPosition[a];
+    const right = sheetPosition[b] === undefined ? Number.MAX_SAFE_INTEGER : sheetPosition[b];
+    return left - right;
+  });
 }
 
 // =====================================================================

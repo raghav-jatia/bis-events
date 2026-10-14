@@ -273,8 +273,17 @@ main{padding-bottom:64px}
 .scard .sc-t{flex:1;min-width:0}
 .scard .sc-date{font-family:var(--disp);font-size:11.5px;color:var(--gold2);font-weight:800;
   letter-spacing:.06em;text-transform:uppercase}
+/* `white-space:nowrap` stops the name wrapping, but it also makes the card's
+   MIN-CONTENT as wide as the longest event name — and .spotlights is a grid,
+   whose items default to min-width:auto, so the whole card refused to shrink
+   and pushed the page sideways. Measured: "English Debates 1 (Grades 9 & 10)"
+   forced a 445px card into a 375px phone, 90px of horizontal overflow on the
+   homepage. The ellipsis never appeared because nothing ever clipped.
+   min-width:0 lets the card shrink to its column; the ellipsis then does the
+   job it was always meant to do. */
 .scard .sc-name{font-family:var(--disp);font-weight:900;font-size:21px;color:#fff;margin:3px 0 9px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spotlights > .scard{min-width:0}
 .scard .places{display:flex;flex-wrap:wrap;gap:7px 16px}
 .scard .pl{font-family:var(--disp);font-weight:800;font-size:14px;
   display:inline-flex;align-items:center;gap:7px}
@@ -338,6 +347,15 @@ tr.clickable:hover{background:rgba(247,184,27,.1)}
 .ev-date{font-family:var(--disp);font-weight:800;color:#fff;font-size:15.5px;white-space:nowrap}
 .ev-grades{font-family:var(--disp);font-weight:800;color:#fff;font-size:15px;white-space:nowrap}
 .ev-name{font-family:var(--disp);font-weight:800;font-size:15.5px;display:flex;align-items:center;gap:10px}
+/* DESKTOP ONLY. A long event name ("English Debates 1 (Grades 9 & 10)") makes
+   the auto-sized Event column claim far more width than it deserves, squeezing
+   every other column. Capping it lets the name wrap onto a second line instead.
+   Scoped to min-width so the MOBILE card layout — where this cell becomes the
+   full-width gold header bar — is untouched. */
+@media(min-width:761px){
+  .tablecard .ev-name{max-width:270px;min-width:0;align-items:flex-start}
+  .tablecard .ev-name .tico{margin-top:1px}
+}
 .ev-name .tico{font-size:17px;display:flex}
 .ev-name .tico.sport{color:var(--type-sport)}
 .ev-name .tico.cc{color:var(--type-cocurricular)}
@@ -384,7 +402,43 @@ tr.clickable:hover .viewcue{background:rgba(247,184,27,.24)}
 .tbox,.dtbox{border-radius:16px;padding:18px 16px;position:relative;overflow:hidden;border:1px solid;min-height:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
 .tbox.win,.dtbox.win{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 16px 40px -26px var(--gold-glow)}
 .tbox .rt,.dtbox .rt{position:absolute;left:16.66%;top:50%;transform:translate(-50%,-50%);width:46px;height:46px;font-size:19px}
-.tbox .tl,.dtbox .ph{font-family:var(--disp);font-weight:900;font-size:21px}
+/* The rank badge is positioned ABSOLUTELY in the left third, so it is outside
+   the flow and centred text will happily run underneath it. Measured before
+   this cap: "3 Beta & Gamma" overlapped the badge by 26px in a 320px box, and
+   it is worse on tablet, where .dtotals columns can be as narrow as 220px.
+   Capping the name's width makes the collision impossible at ANY width — it
+   wraps instead. A single house name ("Gamma") is far below the cap, so those
+   boxes are untouched.
+   Centred text can only ever be half as wide as the gap between the box centre
+   and the badge, which is why the cap looks severe: 2 × (33.34% − 26px). Two
+   house names will not fit on one line in a narrow box at this size, so a tie
+   wraps at the "&" and NOT mid-word — which needs overflow-wrap set back to
+   normal, because line 48 applies `anywhere` to everything outside a table and
+   was splitting "Gamma" into "Ga / mma". A house name must never be broken. */
+.tbox .tl,.dtbox .ph,
+.tbox .tl *,.dtbox .ph *{overflow-wrap:normal;word-break:normal}
+.tbox .tl,.dtbox .ph{font-family:var(--disp);font-weight:900;font-size:21px;
+  max-width:calc(66.68% - 46px);line-height:1.2}
+/* A box holding two names has twice the text in the same width, so it steps the
+   type down rather than wrapping three ways. Single-name boxes never match. */
+.dtbox .ph:has(.amp){font-size:18px}
+/* Tight enough that "Beta & Gamma" reads as one name-pair rather than three
+   separate words. */
+.dtbox .ph .amp{color:var(--muted2);font-weight:700}
+/* Pulls the two names closer around the "&" without deleting the spaces the
+   line-breaker needs. */
+.dtbox .ph{word-spacing:-1px}
+/* A tie between DIFFERENT houses has no single house colour that would be
+   honest, so it takes the MEDAL tint for its position instead — gold, silver
+   or bronze, matching the rank badge sitting beside it. House identity is
+   still carried by the individually-coloured names. A same-house tie
+   ("Beta & Beta") keeps its house tint and never reaches these rules. */
+.dtbox.tie-m1{background:linear-gradient(180deg,rgba(245,197,66,.20),rgba(245,197,66,.045));
+  border-color:rgba(245,197,66,.42)}
+.dtbox.tie-m2{background:linear-gradient(180deg,rgba(199,206,216,.20),rgba(199,206,216,.045));
+  border-color:rgba(199,206,216,.42)}
+.dtbox.tie-m3{background:linear-gradient(180deg,rgba(205,138,78,.22),rgba(205,138,78,.05));
+  border-color:rgba(205,138,78,.44)}
 .tbox .tv,.dtbox .score{font-family:var(--num);font-weight:700;font-size:40px;line-height:1;margin-top:6px}
 .extranote{margin-top:22px;padding-top:16px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
 .extranote .lab{font-size:12.5px;color:#fff;font-weight:600;letter-spacing:.02em}

@@ -25,7 +25,7 @@
 <!-- The ?v= number is a cache-buster. Browsers hold on to CSS and JS for a long
      time, so BUMP THIS NUMBER whenever you change styles.css or any .js file —
      otherwise visitors (and you) can keep running the previous version. -->
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=50">
 </head>
 <body>
 
@@ -254,7 +254,10 @@
       <h2><span class="ico"><svg class="ic"><use href="#i-medal"/></svg></span>Results by category</h2>
       <div class="tablecard"><div class="scroller">
         <table>
-          <thead><tr><th>Category</th><th>Gold</th><th>Silver</th><th>Bronze</th></tr></thead>
+          <!-- The Category header is hidden by render-detail.js when no row in
+               this event names a category, so the column disappears entirely
+               rather than standing empty. -->
+          <thead><tr><th id="detail-category-head">Category</th><th>Gold</th><th>Silver</th><th>Bronze</th></tr></thead>
           <tbody id="detail-category-rows"></tbody>
         </table>
       </div></div>
@@ -266,15 +269,17 @@
       <div id="detail-minisite-body"></div>
     </div>
 
-    <div class="section" id="detail-highlights" hidden>
-      <h2><span class="ico"><svg class="ic"><use href="#i-star"/></svg></span>Highlights</h2>
-      <div class="writeup" id="detail-writeup"></div>
-    </div>
-
-    <!-- Co-curricular / Direct variant -->
+    <!-- Teams sits ABOVE Highlights. Both event types use this one order, so a
+         Sport and a Co-curricular event read the same way down the page:
+         who took part, then the write-up about it. -->
     <div class="section" id="detail-teams" hidden>
       <h2><span class="ico"><svg class="ic"><use href="#i-flag"/></svg></span>Teams</h2>
       <div class="rosters" id="detail-rosters"></div>
+    </div>
+
+    <div class="section" id="detail-highlights" hidden>
+      <h2><span class="ico"><svg class="ic"><use href="#i-star"/></svg></span>Highlights</h2>
+      <div class="writeup" id="detail-writeup"></div>
     </div>
 
     <div class="section" id="detail-photos" hidden>
@@ -349,18 +354,18 @@
      both need lives in render-shared.js, which is why that one loads first.
 -->
 <!-- Keep the ?v= number here the same as the one on styles.css above. -->
-<script src="config.js?v=41"></script>
-<script src="utils.js?v=41"></script>
-<script src="data.js?v=41"></script>
-<script src="validate.js?v=41"></script>
-<script src="calculate.js?v=41"></script>
-<script src="render-shared.js?v=41"></script>
-<script src="render-home.js?v=41"></script>
-<script src="render-events.js?v=41"></script>
-<script src="render-detail.js?v=41"></script>
-<script src="render-debug.js?v=41"></script>
-<script src="navigation.js?v=41"></script>
-<script src="main.js?v=41"></script>
+<script src="config.js?v=50"></script>
+<script src="utils.js?v=50"></script>
+<script src="data.js?v=50"></script>
+<script src="validate.js?v=50"></script>
+<script src="calculate.js?v=50"></script>
+<script src="render-shared.js?v=50"></script>
+<script src="render-home.js?v=50"></script>
+<script src="render-events.js?v=50"></script>
+<script src="render-detail.js?v=50"></script>
+<script src="render-debug.js?v=50"></script>
+<script src="navigation.js?v=50"></script>
+<script src="main.js?v=50"></script>
 
 </body>
 </html>

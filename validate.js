@@ -681,12 +681,16 @@ function checkEventDate(event, report) {
  *
  * IMPORTANT — what is NOT an error here: the same house winning two places in
  * the same category is completely legitimate. Two different swimmers from Beta
- * can take gold and silver of the Under-14. So we do NOT flag a repeated house
- * within a category. (The equivalent check for whole-event placings, where a
- * repeat really is a double-count, is in cleanDirectPlacings below.)
+ * can take gold and silver of the Under-14, and "Beta, Beta" in one place cell
+ * is two Beta entries tying for it. So we do NOT flag a repeated house within a
+ * category, in either form. The same is now true of whole-event placings in
+ * cleanDirectPlacings below — repeats are legal at both tiers.
  *
  * What we DO drop: a placing awarded to a house that doesn't exist, because it
  * would silently award Tier-2 points to nobody.
+ *
+ * What we warn about but never touch: a name cell whose comma-separated count
+ * doesn't match its house cell — see checkNameHouseCounts after this function.
  */
 function cleanTier2(event, report, knownHouseIds) {
   const RANK_LABELS = { 1: "gold", 2: "silver", 3: "bronze" };
@@ -694,7 +698,8 @@ function cleanTier2(event, report, knownHouseIds) {
 
   return (event.tier2 || []).map(function (category) {
     const keptPlaces = [];
-    const namesSeen = {};
+
+    checkNameHouseCounts(event, category, report, RANK_LABELS, RANK_COLUMNS);
 
     category.places.forEach(function (place) {
       if (!place.houseId || !knownHouseIds[place.houseId]) {
@@ -712,37 +717,96 @@ function cleanTier2(event, report, knownHouseIds) {
         return;
       }
 
-      // The same PERSON at two places in one category is a genuine slip.
-      const nameKey = (place.name || "").toLowerCase();
-      if (nameKey && namesSeen[nameKey]) {
-        report.add(
-          VALIDATION_LEVEL.WARNING,
-          "Results",
-          event.id + " / " + category.category,
-          '"' +
-            place.name +
-            '" is listed in more than one place in this category. One person cannot win two places — check the row. (Nothing has been dropped.)',
-          RANK_COLUMNS[place.rank] || ""
-        );
-      }
-      namesSeen[nameKey] = true;
-
       keptPlaces.push(place);
     });
 
-    return { category: category.category, places: keptPlaces };
+    // placeCells is carried through, not dropped. It is the raw text of the two
+    // cells and nothing downstream needs it today — but silently stripping a
+    // field on the way past is how a later check ends up unable to see its own
+    // input, which is exactly the bug this function just had.
+    return {
+      category: category.category,
+      places: keptPlaces,
+      placeCells: category.placeCells,
+    };
+  });
+}
+
+/**
+ * Do the names in a place cell line up with the houses beside them?
+ *
+ * WHY THIS REPLACED THE OLD CHECK. This used to warn when the same PERSON
+ * appeared at two places in one category. That is no longer a fault: under the
+ * repeated-houses rule names legitimately repeat, and the warning had started
+ * firing on correct data — which is the one thing a warning must never do.
+ *
+ * What genuinely goes wrong is a COUNT mismatch between the two cells, because
+ * data.js pairs them off positionally:
+ *
+ *   gold_house "Gamma, Beta" + gold_name "Ana"          → both get "Ana"
+ *   gold_house "Gamma, Beta" + gold_name "Ana, Bo, Cal" → "Cal" is discarded
+ *
+ * Neither changes a single point — the name is display-only — so this is a
+ * WARNING and nothing is dropped or altered. The surplus-name case is the one
+ * worth catching: today that name disappears from the site without trace.
+ *
+ * A BLANK name cell is silent and still scores. Team events are entered that
+ * way on purpose (house only, no individual), so warning there would fire on
+ * correct data for a whole class of event.
+ */
+function checkNameHouseCounts(event, category, report, rankLabels, rankColumns) {
+  const cells = category.placeCells || {};
+
+  Object.keys(cells).forEach(function (rankKey) {
+    const cell = cells[rankKey];
+    const rank = Number(rankKey);
+
+    // Count the comma-separated pieces the maintainer actually typed. An empty
+    // cell counts as 0 rather than 1, so "" never looks like a single name.
+    const count = function (text) {
+      const trimmed = String(text == null ? "" : text).trim();
+      return trimmed === "" ? 0 : trimmed.split(",").length;
+    };
+
+    const houseCount = count(cell.houses);
+    const nameCount = count(cell.names);
+
+    if (nameCount === 0) return;          // blank names: deliberate, stays silent
+    if (houseCount === 0) return;         // no house: the place isn't awarded at all
+    if (nameCount === houseCount) return; // the normal case
+
+    const consequence = nameCount > houseCount
+      ? "so " + (nameCount - houseCount) + " of them " +
+        (nameCount - houseCount === 1 ? "is" : "are") +
+        " not shown anywhere on the site"
+      : "so the first name is shown against every house here";
+
+    report.add(
+      VALIDATION_LEVEL.WARNING,
+      "Results",
+      event.id + " / " + category.category,
+      "The " + (rankLabels[rank] || "rank " + rank) + " place has " + nameCount +
+        " name" + (nameCount === 1 ? "" : "s") + ' ("' + String(cell.names).trim() +
+        '") but ' + houseCount + " house" + (houseCount === 1 ? "" : "s") +
+        ' ("' + String(cell.houses).trim() + '"), ' + consequence +
+        ". The points are unaffected either way — names are display only. " +
+        "Write one name per house, in the same order, or leave the name cell " +
+        "blank for a team event.",
+      rankColumns[rank] || ""
+    );
   });
 }
 
 /**
  * Clean the whole-event house placings of a Direct event (direct_1st/2nd/3rd).
  *
- * This is where a repeated house IS an error: a house cannot finish both 1st
- * and 3rd overall, and leaving it in would award it two lots of Tier-1 points.
+ * A house MAY hold more than one placing here. direct_1st = Beta with
+ * direct_3rd = "Beta, Beta" awards Beta first place and third place twice, for
+ * 5 + 1 + 1 under a 5/3/1 scheme. A tie between different houses
+ * (direct_1st = "Alpha, Beta") works the same way and always has.
  *
- * A TIE is different and perfectly legal: two DIFFERENT houses sharing one
- * place (e.g. direct_1st = "Alpha, Beta") passes through untouched, because the
- * house ids differ.
+ * That is a rule CHANGE, made October 2026. This function used to reject a
+ * repeat as an ERROR; see the note inside it for why the guard must not return.
  *
  * GRANULARITY, same rule as Tier 2: one bad cell removes ONE placing. A typo in
  * direct_2nd never removes the 1st and 3rd places alongside it, and never
@@ -754,8 +818,17 @@ function cleanDirectPlacings(event, report, knownHouseIds) {
   const PLACE_LABELS = { 1: "1st", 2: "2nd", 3: "3rd" };
   const PLACE_COLUMNS = { 1: "direct_1st", 2: "direct_2nd", 3: "direct_3rd" };
   const keptPlacings = [];
-  const positionByHouse = {}; // houseId → the place it was first seen at
 
+  // NO SAME-HOUSE GUARD, DELIBERATELY. A house may hold more than one placing
+  // in the same event: direct_1st = Beta, direct_3rd = "Beta, Beta" awards Beta
+  // first place AND third place twice over, and that is the intended rule, not
+  // a mistake to catch.
+  //
+  // Until October 2026 a repeat was reported as an ERROR and dropped. That cost
+  // the house its points and, because the dropped placing left its position
+  // empty, removed that place's box from the event's page entirely. Do not add
+  // the guard back. The only thing still rejected below is a house name that is
+  // not in the Houses tab, which really would score for nobody.
   (event.directPlacings || []).forEach(function (placing) {
     // --- unknown house: drop it, it would score for nobody ---
     if (!placing.houseId || !knownHouseIds[placing.houseId]) {
@@ -773,37 +846,6 @@ function cleanDirectPlacings(event, report, knownHouseIds) {
       return;
     }
 
-    // --- same house placed twice: a real double-count ---
-    const firstPosition = positionByHouse[placing.houseId];
-    if (firstPosition !== undefined) {
-      const message =
-        firstPosition === placing.position
-          ? '"' +
-            placing.houseRaw +
-            '" is listed twice in the ' +
-            (PLACE_LABELS[placing.position] || "place " + placing.position) +
-            " place. The repeat has been ignored."
-          : '"' +
-            placing.houseRaw +
-            '" is placed both ' +
-            (PLACE_LABELS[firstPosition] || firstPosition) +
-            " and " +
-            (PLACE_LABELS[placing.position] || placing.position) +
-            ". A house can only finish once, so the " +
-            (PLACE_LABELS[placing.position] || placing.position) +
-            " entry has been ignored — check which is correct.";
-
-      report.add(
-        VALIDATION_LEVEL.ERROR,
-        "Events",
-        event.id,
-        message,
-        PLACE_COLUMNS[placing.position] || ""
-      );
-      return;
-    }
-
-    positionByHouse[placing.houseId] = placing.position;
     keptPlacings.push(placing);
   });
 

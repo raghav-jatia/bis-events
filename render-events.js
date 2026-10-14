@@ -246,7 +246,7 @@ function renderCompletedEventsTable(data, completed) {
         // into cards on mobile, hence the mobile-head class.
         '<td class="mobile-head" data-label=""><div class="ev-name">' +
         typeIconHtml(event) +
-        escapeHtml(event.name) +
+        escapeHtmlWithBreaks(event.name) +
         "</div></td>" +
         // Details pill, wording and destination from the shared rule in
         // render-shared.js. Empty for an event with nothing on its page, so
@@ -411,7 +411,7 @@ function renderCalendar(data) {
         // into cards on mobile.
         '<td class="mobile-head" data-label=""><div class="ev-name">' +
         typeIconHtml(event) +
-        escapeHtml(event.name) +
+        escapeHtmlWithBreaks(event.name) +
         "</div></td>" +
         '<td data-label="Grades" class="ev-grades">' +
         escapeHtml(event.grades) +

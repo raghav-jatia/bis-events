@@ -48,23 +48,72 @@ function renderDetailTotals(data, event) {
         return { houseId: award.houseId, rank: award.position, points: null };
       });
 
-  const html = rows
-    .map(function (row) {
-      const house = findHouse(data, row.houseId);
-      const colour = houseColour(house);
-      const isLeader = row.rank === 1;
+  // ONE BOX PER RANK, not one per house. Houses sharing a rank are a tie and
+  // belong together: "3  Beta & Gamma" reads as one result, where two separate
+  // rank-3 boxes read as two. A house tied with ITSELF ("Beta, Beta" at third)
+  // keeps both names for the same reason — the two points are only visible if
+  // both are shown.
+  //
+  // Different ranks never merge, so a house placed 1st AND 2nd still gets a box
+  // each. Rank order is preserved from `rows`, which is already in finishing
+  // order, and duplicates within a rank are preserved.
+  const byRank = [];
+  rows.forEach(function (row) {
+    const open = byRank[byRank.length - 1];
+    if (open && open.rank === row.rank) {
+      open.houseIds.push(row.houseId);
+      return;
+    }
+    byRank.push({ rank: row.rank, points: row.points, houseIds: [row.houseId] });
+  });
+
+  const html = byRank
+    .map(function (group) {
+      const isLeader = group.rank === 1;
+
+      // The box is tinted with ONE colour, so it can only carry a colour when
+      // every house in it is the same house — which is exactly the "Beta & Beta"
+      // case. A tie between DIFFERENT houses has no single colour that would be
+      // honest, so the box stays neutral and each name carries its own colour,
+      // the same way the results tables already do it.
+      const allSame = group.houseIds.every(function (id) {
+        return id === group.houseIds[0];
+      });
+      const boxHouse = allSame ? findHouse(data, group.houseIds[0]) : null;
+      const boxColour = allSame ? houseColour(boxHouse) : null;
+
+      // Mixed tie: no honest single house colour, so it wears the MEDAL tint for
+      // its position instead — the same gold/silver/bronze as the rank badge
+      // beside it. Beyond 3rd there is no medal, so it stays untinted.
+      const medalClass =
+        !allSame && group.rank >= 1 && group.rank <= 3 ? " tie-m" + group.rank : "";
+
+      const names = group.houseIds
+        .map(function (houseId) {
+          const house = findHouse(data, houseId);
+          return (
+            '<span style="color:' + houseColour(house) + '">' +
+            escapeHtml(house ? house.name : "") +
+            "</span>"
+          );
+        })
+        // Real spaces around the "&" on purpose: they are the only place the
+        // browser is allowed to break the line, and without them a long pair
+        // was being split mid-name ("Gam / ma"). The gap is tightened in CSS
+        // with word-spacing, not by removing them.
+        .join(' <span class="amp">&amp;</span> ');
 
       return (
-        '<div class="dtbox' + (isLeader ? " win" : "") + '" style="' +
-        houseBoxStyle(colour, isLeader) + '">' +
-        rankToken(row.rank) +
-        '<span class="ph" style="color:' + colour + '">' +
-        escapeHtml(house ? house.name : "") +
-        "</span>" +
-        (row.points === null
+        '<div class="dtbox' + (isLeader ? " win" : "") + medalClass + '"' +
+        (boxColour ? ' style="' + houseBoxStyle(boxColour, isLeader) + '"' : "") +
+        ">" +
+        rankToken(group.rank) +
+        '<span class="ph">' + names + "</span>" +
+        (group.points === null
           ? ""
-          : '<span class="score" style="color:' + colour + '">' +
-            formatPoints(row.points) + "</span>") +
+          : '<span class="score"' +
+            (boxColour ? ' style="color:' + boxColour + '"' : "") + ">" +
+            formatPoints(group.points) + "</span>") +
         "</div>"
       );
     })
@@ -137,14 +186,32 @@ function renderDetailCategories(data, event) {
     event.resultsMode === RESULTS_MODE.OVERRIDE;
   const categories = showsCategories ? event.tier2 || [] : [];
 
+  // Some events have no age/grade categories at all — a single overall result,
+  // with the category cell left blank on every row. Showing an empty first
+  // column there reads as missing data rather than as "this event has no
+  // categories", so the column is dropped entirely.
+  //
+  // Only when EVERY row is blank. A half-filled column is a data problem the
+  // maintainer should see, not something to tidy away.
+  const hasAnyCategory = categories.some(function (category) {
+    return String(category.category || "").trim() !== "";
+  });
+
+  const head = el("detail-category-head");
+  if (head) head.hidden = !hasAnyCategory;
+
   const rows = categories
     .map(function (category) {
       return (
         "<tr>" +
-        // The category name doubles as the gold header bar on mobile.
-        '<td class="mobile-head cat-name" data-label="">' +
-        escapeHtml(category.category) +
-        "</td>" +
+        // The category name doubles as the gold header bar on mobile — so when
+        // there are no categories the cell is omitted rather than emptied, and
+        // the card simply starts at Gold.
+        (hasAnyCategory
+          ? '<td class="mobile-head cat-name" data-label="">' +
+            escapeHtml(category.category) +
+            "</td>"
+          : "") +
         categoryCellHtml(data, category, 1, "Gold") +
         categoryCellHtml(data, category, 2, "Silver") +
         categoryCellHtml(data, category, 3, "Bronze") +
@@ -534,7 +601,10 @@ function renderEventDetail(data, eventId) {
     return false;
   }
 
-  el("detail-title").textContent = event.name;
+  // innerHTML rather than textContent, so a line break typed in the Sheet is
+  // honoured here too. escapeHtmlWithBreaks escapes the name first and only
+  // then inserts the <br>, so nothing a maintainer types can become markup.
+  el("detail-title").innerHTML = escapeHtmlWithBreaks(event.name);
 
   // Date · venue, with either part left out if it isn't filled in (§11).
   // Deliberately no type or status flag here, per blueprint §6.3.

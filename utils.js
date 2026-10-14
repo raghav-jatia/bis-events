@@ -46,6 +46,32 @@ function escapeHtml(text) {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Same as escapeHtml, but a line break typed in the Sheet becomes a real line
+ * break on the page.
+ *
+ * Alt+Enter (Ctrl+Enter on some keyboards) inside a cell puts a newline in it,
+ * and that newline DOES survive Google's CSV export — the field comes back
+ * wrapped in quotes with the newline intact, and data.js's parser already
+ * handles it. Verified against this workbook: 14 such cells on the CHECK
+ * Summary tab, 8 on Events.
+ *
+ * It lets a maintainer choose where a long event name wraps — breaking
+ * "English Debates 1" before "(Grades 9 & 10)" rather than wherever the column
+ * happens to run out.
+ *
+ * ESCAPE FIRST, THEN INSERT THE TAG. Everything the Sheet contains is typed by
+ * students and staff, so it is escaped exactly as before and the only HTML that
+ * can ever appear is the <br> this function adds itself. A name containing
+ * "<script>" stays inert text.
+ *
+ * A name with no newline comes out byte-identical to escapeHtml, so nothing
+ * that does not use the feature changes in any way.
+ */
+function escapeHtmlWithBreaks(text) {
+  return escapeHtml(text).replace(/\r\n|\r|\n/g, "<br>");
+}
+
 // =====================================================================
 // Dates
 // =====================================================================

@@ -83,7 +83,7 @@ function renderLiveBanner(data) {
       const inner =
         '<span class="lb-dot"></span>' +
         '<span class="lb-tag">Live now</span>' +
-        '<span class="lb-name">' + escapeHtml(event.name) + "</span>" +
+        '<span class="lb-name">' + escapeHtmlWithBreaks(event.name) + "</span>" +
         (destination.kind === "none"
           ? ""
           : '<span class="lb-link">' + escapeHtml(destination.label) + " " +
@@ -403,7 +403,7 @@ function renderSpotlight(data, events, carryAllEventsLink) {
         '<div class="cup">' + icon(typeIconName(event)) + "</div>" +
         '<div class="sc-t">' +
         '<div class="sc-date">' + escapeHtml(meta) + "</div>" +
-        '<div class="sc-name">' + escapeHtml(event.name) + "</div>" +
+        '<div class="sc-name">' + escapeHtmlWithBreaks(event.name) + "</div>" +
         (placings ? '<div class="places">' + placings + "</div>" : "") +
         "</div>" +
         '<span class="go">' + icon("arrow") + "</span>" +
@@ -458,7 +458,7 @@ function renderLatestResults(data, excludeIds) {
         '<div class="cup">' + icon("trophy") + "</div>" +
         '<div class="lc-t">' +
         '<div class="lc-date">' + escapeHtml(meta) + "</div>" +
-        '<div class="lc-name">' + escapeHtml(event.name) + "</div>" +
+        '<div class="lc-name">' + escapeHtmlWithBreaks(event.name) + "</div>" +
         (placings ? '<div class="places">' + placings + "</div>" : "") +
         "</div>" +
         '<span class="go">' + icon("arrow") + "</span>" +
@@ -512,7 +512,7 @@ function renderUpcoming(data) {
         '<div class="ucard"' + eventTargetAttr(event) + ">" +
         '<span class="evicon">' + icon(typeIconName(event)) + "</span>" +
         '<div class="uc-t">' +
-        '<div class="en">' + escapeHtml(event.name) + "</div>" +
+        '<div class="en">' + escapeHtmlWithBreaks(event.name) + "</div>" +
         (parts
           ? '<div class="datebox"><span class="d">' + parts.day +
             '</span><span class="mo">' + parts.month + "</span></div>"
